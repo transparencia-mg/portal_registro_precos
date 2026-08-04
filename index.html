@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Registro de Preços - Atas de Adesão (Carona) - Portal da Transparência MG</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <style>
+        /* ============================================================
+           1. VARIÁVEIS DE CORES
+        ============================================================ */
+        :root {
+            --primary-dark:      #1a3a5c;
+            --primary-darker:    #0f2a44;
+            --accent-red:        #b93c42;
+            --accent-bright:     #db233f;
+            --background-light:  #f5f7fa;
+            --success-green:     #28a745;
+            --warning-yellow:    #ffc107;
+            --info-blue:         #17a2b8;
+            --border-color:      #dee2e6;
+        }
+
+        /* ============================================================
+           2. RESET E CONFIGURAÇÕES GLOBAIS
+        ============================================================ */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; overflow-x: hidden; margin: 0; padding: 0; height: auto; min-height: auto; }
+        body {
+            font-family: 'Montserrat', Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-light);
+            padding-bottom: 15px;
+            overflow-x: hidden;
+        }
+        body, button, input, select, textarea, span, div { font-family: 'Montserrat', sans-serif !important; }
+        .material-icons { font-family: 'Material Icons' !important; font-size: 14px; vertical-align: middle; }
+
+        /* ============================================================
+           3. LAYOUT PRINCIPAL
+        ============================================================ */
+        .main-container { height: auto; min-height: auto; overflow: visible; position: relative; }
+        .container-fluid { width: 100%; max-width: 88% !important; padding: 0 40px; margin: 0; }
+        .dashboard-container { width: 100%; max-width: 100%; padding: 0 40px; margin: 0 auto; }
+        .tab-content, .tab-pane { width: 100%; height: auto; min-height: auto; overflow: visible; }
+        .table-container { height: auto; min-height: auto; overflow: visible; position: relative; }
+
+        /* ============================================================
+           4. DATA DE ATUALIZAÇÃO
+        ============================================================ */
+        .data-atualizacao-container { display: flex; justify-content: left; align-items: center; margin: 15px 0; flex-wrap: wrap; gap: 10px; }
+        .data-atualizacao-box {
+            background: transparent !important;
+            border-radius: 8px;
+            padding: 8px 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--primary-dark);
+            font-weight: 600;
+            box-shadow: none;
+        }
+        .data-atualizacao-box i { font-size: 14px; color: var(--accent-red); }
+        .badge-conformidade { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-conformidade.ok { background:#dcf5e7; color:#0f6b3a; border:1px solid #b2e6c8; }
+        .badge-conformidade.alerta { background:#fff3cd; color:#856404; border:1px solid #ffe082; }
+
+        /* ============================================================
+           5. FILTROS
+        ============================================================ */
+        .filter-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .filter-label { font-size: 13px; font-weight: 600; color: #1a3a5c; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-control, .form-select {
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            height: auto;
+            width: 100%;
+        }
+        .form-control:focus, .form-select:focus { border-color: var(--accent-red); box-shadow: 0 0 0 2px rgba(185,60,66,0.15); }
+        .modern-select {
+            border: 1.5px solid #dfe5ec !important;
+            border-radius: 8px !important;
+            padding: 10px 12px !important;
+            font-size: 13px !important;
+            height: 42px !important;
+            line-height: 1.5 !important;
+            background-color: #fff;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        .modern-select:focus { border-color: #1a3a5c !important; box-shadow: 0 0 0 2px rgba(26,58,92,0.1); }
+        .filters-row { display: flex; gap: 15px; width: 100%; flex-wrap: wrap; margin-bottom: 12px; }
+        .filter-group { flex: 1; min-width: 160px; }
+        .botoes-abaixo { margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+        /* ============================================================
+           6. CARDS DE MÉTRICAS
+        ============================================================ */
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e9ef;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+            overflow: hidden;
+            height: 100%;
+            transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+        .metric-card:hover { box-shadow: 0 8px 24px rgba(26,58,92,0.13); transform: translateY(-2px); }
+        .metric-header {
+            background: #20445d;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .metric-body { padding: 12px 15px; }
+        .metric-value { font-size: 20px; font-weight: 700; color: #171c21; }
+        .metric-sublabel { font-size: 10px; color: #94a3b8; font-weight: 500; margin-top: 2px; }
+
+        /* ============================================================
+           7. GRÁFICOS
+        ============================================================ */
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .chart-container canvas { max-width: 100%; }
+        .chart-header {
+            background: #20445d;
+            color: white;
+            padding: 12px 16px;
+            margin: 0;
+        }
+        .chart-title { font-size: 14px; font-weight: 600; color: white; margin: 0; }
+        .chart-wrapper { height: 280px; padding: 10px 15px; width: 100%; }
+
+        /* ============================================================
+           8. TABELAS
+        ============================================================ */
+        .table-header {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-darker) 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .table-title { font-size: 13px; font-weight: 600; margin: 0; }
+        .table-badge { background: #1a3a5c; color: white; padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .table-fixed-header-container { position: relative; overflow: auto; width: 100%; max-height: 600px; }
+        .table-fixed-header-container table thead th {
+            background-color: #54697b !important;
+            color: white !important;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-weight: 600;
+            padding: 12px 10px;
+            font-size: 12px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .table { width: 100%; font-size: 12px; border-collapse: collapse; table-layout: auto; }
+        .table th, .table td { border: 1px solid #d6dee6; }
+        .table thead th {
+            background-color: #54697b !important;
+            color: white !important;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 12px 10px;
+            text-transform: uppercase;
+            border: 1px solid #d6dee6;
+            cursor: pointer;
+            user-select: none;
+        }
+        .table thead th:first-child { border-top-left-radius: 8px; }
+        .table thead th:last-child  { border-top-right-radius: 8px; }
+        .table thead th:hover { background-color: #3d5566 !important; }
+        .table tbody tr { background-color: #ffffff; }
+        .table tbody td { padding: 10px 10px; vertical-align: middle; border-bottom: 1px solid #f1f1f1; font-size: 12px; }
+        .table tbody tr:hover { background-color: rgba(41,67,90,0.04); }
+        .table tfoot { position: sticky; bottom: 0; z-index: 20; }
+        .table tfoot tr, .table tfoot td { background-color: #dfe3e8 !important; font-weight: 700; font-size: 12px; }
+
+        .orgao-link, .ata-link { color: #006a82; text-decoration: none; font-weight: 400; cursor: pointer; }
+        .orgao-link:hover, .ata-link:hover { color: var(--accent-red); text-decoration: underline; }
+
+        .sortable-header { cursor: pointer; position: relative; padding-right: 22px !important; }
+        .sortable-header:hover { background-color: #3d5566 !important; }
+        .sortable-header i { font-size: 13px; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); opacity: 0.8; }
+
+        .badge-tipo { padding: 3px 8px; border-radius: 20px; font-size: 10.5px; font-weight: 700; display: inline-block; letter-spacing: 0.2px; white-space: nowrap; }
+        .badge-arp     { background: #dcf5e7; color: #0f6b3a; border: 1px solid #b2e6c8; }
+        .badge-pregao  { background: #cce5ff; color: #004085; border: 1px solid #b8d4f5; }
+        .badge-outro   { background: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+
+        .nao-aplica { color: #adb5bd; font-size: 11px; }
+        .text-right { text-align: right; }
+
+        /* ============================================================
+           9. BOTÕES
+        ============================================================ */
+        .btn-pesquisa {
+            background: linear-gradient(to right, #20445d, #20445d);
+            border: none; padding: 0 16px; font-weight: 600; border-radius: 6px;
+            transition: all 0.3s ease; font-size: 13px; color: white;
+            display: inline-flex; align-items: center; gap: 4px; cursor: pointer; height: 36px; white-space: nowrap;
+        }
+        .btn-pesquisa:hover { background: linear-gradient(to right, var(--accent-red), #a32c32); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(185,60,66,0.2); color: white; }
+        .btn-secondary-custom {
+            background: white; border: 2px solid var(--primary-darker); color: var(--primary-darker);
+            padding: 0 16px; font-weight: 600; font-size: 13px; border-radius: 6px;
+            transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 4px;
+            cursor: pointer; height: 36px; white-space: nowrap; text-decoration: none !important;
+        }
+        .btn-secondary-custom:hover { background-color: #132837 !important; color: white !important; border-color: #132837 !important; }
+        .btn-export {
+            appearance: none; -webkit-appearance: none; background: transparent !important;
+            border: 1px solid #d6dee6; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600;
+            color: var(--primary-dark); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-export:hover { background: var(--primary-dark) !important; color: white !important; border-color: var(--primary-dark); }
+        .btn-download-card {
+            background: white; border: 1px solid #e5e9ef; border-radius: 10px; padding: 20px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.06); transition: all 0.25s ease; height: 100%;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .btn-download-card:hover { box-shadow: 0 8px 24px rgba(26,58,92,0.13); transform: translateY(-2px); }
+        .btn-download-card .dl-icon { width: 42px; height: 42px; border-radius: 8px; background: #20445d; color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .btn-download-card h6 { font-size: 14px; font-weight: 700; color: var(--primary-dark); margin: 0; }
+        .btn-download-card p { font-size: 12px; color: #64748b; margin: 0; flex-grow: 1; }
+
+        /* ============================================================
+           10. NAV TABS
+        ============================================================ */
+        .nav-tabs-container { background: transparent; padding: 10px 0; margin-top: 15px; margin-bottom: 15px; width: 100%; }
+        .nav-tabs { border: none !important; gap: 10px; width: 100%; flex-wrap: wrap; }
+        .nav-tabs .nav-link {
+            border: none !important; border-radius: 10px !important; background: #eef1f6 !important;
+            color: #354a5f !important; font-size: 13px; font-weight: 600; padding: 10px 18px !important;
+            display: flex; align-items: center; gap: 6px; transition: all 0.2s ease;
+        }
+        .nav-tabs .nav-link:hover { background: #e6e9ed !important; }
+        .nav-tabs .nav-link.active { background: #234c63 !important; color: #fff !important; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .nav-tabs .material-icons { font-size: 14px !important; }
+
+        /* ============================================================
+           11. MODAL
+        ============================================================ */
+        .modal-creative { border: none; border-radius: 14px; overflow: hidden; }
+        .modal-creative .modal-header { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-darker) 100%); color: white; border: none; }
+        .modal-creative .modal-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .info-item { background: #f8fafd; border: 1px solid #eef1f6; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
+        .info-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+        .info-value { font-size: 13px; font-weight: 500; color: #1e293b; word-break: break-word; }
+        .info-value.highlight { font-size: 15px; color: var(--accent-red); font-weight: 700; }
+        body.modal-open { overflow: auto !important; padding-right: 0 !important; position: static !important; }
+        .modal { overflow-y: auto !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; }
+        .modal-backdrop { position: fixed !important; top: 0 !important; left: 0 !important; }
+        .modal-dialog-scrollable .modal-body { overflow-y: auto; max-height: 70vh; }
+        .modal-dialog { margin: 1.75rem auto !important; }
+
+        /* ============================================================
+           12. PAGINAÇÃO
+        ============================================================ */
+        .pagination-container {
+            display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;
+            background: white; border-top: 1px solid #dee2e6; width: 100%; flex-wrap: wrap; gap: 10px; border-radius: 0 0 8px 8px;
+        }
+        .pagination-info { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #6c757d; flex-wrap: wrap; }
+        .pagination-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .pagination-controls button {
+            min-width: 34px; height: 34px; border: 1px solid #dee2e6; background: white; color: var(--primary-dark);
+            border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s; font-size: 13px; padding: 0 6px;
+        }
+        .pagination-controls button:hover:not(:disabled) { background-color: var(--primary-dark); color: white; border-color: var(--primary-dark); }
+        .pagination-controls button.active { background-color: var(--primary-dark); color: white; border-color: var(--primary-dark); }
+        .pagination-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-size-selector { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6c757d; }
+        .page-size-selector select { width: 70px; border: 1px solid #d6dee6; border-radius: 6px; padding: 4px 6px; font-size: 12px; background-color: white; color: var(--primary-dark); font-weight: 600; cursor: pointer; outline: none; }
+
+        /* ============================================================
+           13. TOOLBAR
+        ============================================================ */
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+        .toolbar-left  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        /* ============================================================
+           14. LOADING / TOAST
+        ============================================================ */
+        .loading-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(238,241,246,0.95); z-index: 9999; justify-content: center; align-items: center;
+            flex-direction: column; gap: 14px;
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-progress { font-size: 13px; color: #20445d; font-weight: 700; }
+        .toast-notification {
+            position: fixed; top: 20px; right: 20px; background: white; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 12px 20px; transform: translateX(120%);
+            transition: transform 0.3s ease; z-index: 10000; border-left: 4px solid; max-width: 350px;
+        }
+        .toast-notification.show { transform: translateX(0); }
+        .toast-notification.success { border-left-color: var(--success-green); }
+        .toast-notification.error { border-left-color: var(--accent-red); }
+        .toast-content { display: flex; align-items: center; font-size: 13px; color: var(--primary-dark); gap: 8px; }
+
+        /* ============================================================
+           15. DICIONÁRIO / METADATA
+        ============================================================ */
+        .metadata-container { background: white; border-radius: 10px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); overflow: hidden; margin-bottom: 20px; }
+        .metadata-header { background: #20445d; color: white; padding: 12px 16px; font-size: 13px; font-weight: 700; }
+        .metadata-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .metadata-table thead th { background-color: #54697b !important; color: white !important; padding: 10px; font-size: 11px; text-transform: uppercase; font-weight: 600; }
+        .metadata-table tbody tr:nth-child(even) { background: #f8fafd; }
+        .metadata-table tbody td { padding: 10px; border-bottom: 1px solid #f0f4f8; vertical-align: top; color: #334155; }
+        .metadata-table code { background: #e2e8f0; color: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .criterio-box { background: #f8fafd; border: 1px solid #eef1f6; border-left: 4px solid var(--primary-dark); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+        .criterio-box h6 { font-size: 13px; font-weight: 700; color: var(--primary-dark); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .criterio-box p { font-size: 12.5px; color: #475569; margin: 0; line-height: 1.5; }
+
+        /* ============================================================
+           16. RESPONSIVIDADE
+        ============================================================ */
+        @media (max-width: 992px) { .container-fluid, .dashboard-container { padding: 0 15px !important; } }
+        @media (max-width: 768px) {
+            .container-fluid, .dashboard-container { padding: 0 8px !important; max-width: 100% !important; }
+            .nav-tabs-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .nav-tabs { flex-wrap: nowrap !important; gap: 6px; min-width: max-content; }
+            .nav-tabs .nav-link { width: auto; justify-content: flex-start; font-size: 12px; padding: 8px 12px !important; border-radius: 8px !important; white-space: nowrap; }
+            .filters-row { flex-direction: column; }
+            .filter-group { min-width: 100%; width: 100%; }
+            .botoes-abaixo { flex-direction: column; }
+            .toolbar-right input { width: 100% !important; }
+            .pagination-container { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .table-fixed-header-container { max-height: 420px; }
+            .table { font-size: 11px; }
+            .table thead th, .table tbody td { padding: 6px 5px; font-size: 11px; }
+            .modal-dialog { max-width: 100% !important; width: 100% !important; margin: 0 !important; min-height: 100vh; }
+            .modal-content { border-radius: 0 !important; }
+            .modal-dialog-scrollable .modal-body { max-height: 65vh; }
+            .chart-wrapper { height: 220px; }
+            .row.g-3 > .col-md-3 { flex: 0 0 50%; max-width: 50%; }
+            .metric-card { margin-bottom: 8px; }
+        }
+        @media (max-width: 480px) {
+            .row.g-3 > .col-md-3 { flex: 0 0 100%; max-width: 100%; }
+            .pagination-controls button { min-width: 28px; height: 28px; font-size: 11px; }
+        }
+    </style>
+</head>
+<body class="iframe-mode">
+
+<div class="main-container">
+    <div class="container-fluid dashboard-container">
+
+        <!-- Navegação por abas -->
+        <div class="nav-tabs-container">
+            <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="visao-geral-tab" data-bs-toggle="tab" data-bs-target="#visao-geral">
+                        <i class="material-icons">bar_chart</i>Visão Geral por Órgão
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="consulta-tab" data-bs-toggle="tab" data-bs-target="#consulta">
+                        <i class="material-icons">fact_check</i>Consulta Individual
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="dicionario-tab" data-bs-toggle="tab" data-bs-target="#dicionario">
+                        <i class="material-icons">menu_book</i>Dicionário de Dados
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="downloads-tab" data-bs-toggle="tab" data-bs-target="#downloads">
+                        <i class="material-icons">download</i>Downloads
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Data de atualização -->
+        <div class="data-atualizacao-container">
+            <div class="data-atualizacao-box">
+                <i class="material-icons">event</i>
+                Ata mais recente: <span id="data-atualizacao-header" style="margin-left:4px;">Carregando...</span>
+            </div>
+            <span class="badge-conformidade" id="badgeAtualidade"><i class="material-icons" style="font-size:12px;">hourglass_top</i> Verificando...</span>
+        </div>
+
+        <!-- Conteúdo das abas -->
+        <div class="tab-content" id="dashboardTabsContent">
+            <div class="tab-pane fade show active" id="visao-geral" role="tabpanel">
+                <div id="visao-geral-content"></div>
+            </div>
+            <div class="tab-pane fade" id="consulta" role="tabpanel">
+                <div id="consulta-content"></div>
+            </div>
+            <div class="tab-pane fade" id="dicionario" role="tabpanel">
+                <div id="dicionario-content"></div>
+            </div>
+            <div class="tab-pane fade" id="downloads" role="tabpanel">
+                <div id="downloads-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalhes da Ata -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content modal-creative">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="material-icons">description</i> Detalhes da Ata de Adesão</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalContent"></div>
+            <div class="modal-footer" style="gap:8px;">
+                <button class="btn-export" id="btnAbrirAtaModal"><i class="material-icons">picture_as_pdf</i> Abrir Ata (PDF)</button>
+                <button class="btn-export" onclick="copiarLinkDireto()"><i class="material-icons">link</i> Copiar Link</button>
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal"><i class="material-icons">close</i> Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toastSucesso" class="toast-notification success" style="display:none;">
+    <div class="toast-content"><i class="material-icons" style="color:#28a745">check_circle</i><span>Link copiado para área de transferência!</span></div>
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border" role="status" style="color:#20445d;width:2.5rem;height:2.5rem;"></div>
+    <div class="loading-progress" id="loadingProgress">Carregando dados...</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ============================================================
+// 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
+// ============================================================
+const CSV_URL = 'https://raw.githubusercontent.com/transparencia-mg/portal_registro_precos/main/dataset/data/atas.csv';
+const REPO_URL = 'https://github.com/transparencia-mg/portal_registro_precos';
+
+const TIPOS_CONHECIDOS = [
+    'Ata de Registro de Preços', 'Pregão Eletrônico', 'Pregão Presencial',
+    'Concorrência', 'Dispensa de Licitação', 'Tomada de Preços', 'Convite', 'RDC'
+];
+
+let dadosCompletos = [];   // uma linha por ata (já parseada)
+let dadosFiltradosCI = [];
+let modalAtaAtual = null;
+
+let sortConfigVG = { coluna: 'total_atas', direcao: 'desc' };
+let sortConfigCI = { coluna: 'data_ord', direcao: 'desc' };
+
+let paginacaoVG = { paginaAtual: 1, itensPorPagina: 25 };
+let paginacaoCI = { paginaAtual: 1, itensPorPagina: 25 };
+
+let chartOrgao = null;
+let chartAno = null;
+let chartTipo = null;
+
+const chartPalette = ['#1a3a5c','#2c5f8a','#3a7cb8','#5a9fd4','#7ab8e0','#9dd1ec','#d4a017','#c0392b','#27ae60','#8e44ad'];
+
+// ============================================================
+// 2. AUXILIARES
+// ============================================================
+function mostrarLoading(show, msg) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (show) overlay.classList.add('show'); else overlay.classList.remove('show');
+    if (msg) document.getElementById('loadingProgress').textContent = msg;
+}
+
+function mostrarToast(mensagem, tipo) {
+    document.querySelectorAll('.toast-notification').forEach(t => { t.style.display='none'; });
+    const toast = document.getElementById('toastSucesso');
+    toast.querySelector('span').textContent = mensagem;
+    toast.style.display = 'flex';
+    toast.classList.add('show');
+    setTimeout(() => { toast.classList.remove('show'); toast.style.display='none'; }, 2500);
+}
+
+function copiarLinkDireto() {
+    const link = (modalAtaAtual && modalAtaAtual.link_ata) ? modalAtaAtual.link_ata : window.location.href;
+    navigator.clipboard.writeText(link).then(() => mostrarToast('Link copiado para área de transferência!','success'))
+        .catch(() => mostrarToast('Não foi possível copiar o link.','error'));
+}
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return str.toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getBadgeTipo(tipo) {
+    if (!tipo) return 'badge-outro';
+    const t = tipo.toLowerCase();
+    if (t.includes('registro de preços')) return 'badge-arp';
+    if (t.includes('pregão')) return 'badge-pregao';
+    return 'badge-outro';
+}
+
+function iframeUpdateHeight() {
+    if (window.__modalAberto) return;
+    setTimeout(function() {
+        if (window.__modalAberto) return;
+        const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) + 20;
+        try { if (window.parent && window.parent !== window) window.parent.postMessage({ iframeHeight: h, height: h, type: 'resize' }, '*'); } catch(e) {}
+    }, 200);
+}
+
+// ============================================================
+// 3. PARSER DA COLUNA "nome" DO CSV
+//    Padrão observado: "{ORGAO} – {TIPO} nº {NUM} – Gestor – {ENTIDADE ADERENTE} (dd.mm.aaaa)"
+//    A coluna "pagina" é desconsiderada, conforme solicitado.
+// ============================================================
+function parseAta(row, idx) {
+    const nomeOriginal = (row.nome || '').trim();
+    const nome = nomeOriginal.replace(/\u00a0/g, ' ').trim();
+    const linkAta = (row.arquivo || '').trim();
+
+    // Órgão: primeiro segmento antes do primeiro travessão " – " ou " - "
+    const partes = nome.split(/\s[–-]\s/).map(p => p.trim()).filter(Boolean);
+    let orgao = partes.length ? partes[0] : '';
+    // Corrige casos em que o órgão veio colado ao tipo sem espaço em torno do traço
+    orgao = orgao.replace(/^\s+|\s+$/g,'');
+    if (!orgao) orgao = 'NÃO IDENTIFICADO';
+
+    // Tipo do instrumento (primeira ocorrência conhecida no texto)
+    let tipo = 'Outro';
+    for (const t of TIPOS_CONHECIDOS) {
+        const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
+        if (re.test(nome)) { tipo = t; break; }
+    }
+
+    // Número: "nº/n°/Nº <valor>" logo após o tipo identificado
+    let numero = '';
+    const reNum = new RegExp(tipo.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\s*n[ºo°]\\s*[:.]?\\s*([\\w./-]+)', 'i');
+    const mNum = nome.match(reNum);
+    if (mNum) numero = mNum[1];
+
+    // Data: última ocorrência no padrão dd.mm.aaaa ou dd/mm/aaaa no texto
+    let dataStr = '';
+    let ano = '';
+    const datas = [...nome.matchAll(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/g)];
+    if (datas.length) {
+        const d = datas[datas.length - 1];
+        dataStr = `${d[1].padStart(2,'0')}/${d[2].padStart(2,'0')}/${d[3]}`;
+        ano = d[3];
+    }
+    if (!ano) {
+        const ys = (numero.match(/20\d{2}/g)) || (nome.match(/20\d{2}/g));
+        ano = ys ? ys[ys.length - 1] : '';
+    }
+
+    // Entidade aderente / gestor: texto após a última ocorrência de "Gestor"
+    let entidade = '';
+    const idxGestor = nome.toLowerCase().lastIndexOf('gestor');
+    if (idxGestor >= 0) {
+        entidade = nome.substring(idxGestor + 6).replace(/^[\s–-]+/, '');
+    } else if (partes.length) {
+        entidade = partes[partes.length - 1];
+    }
+    entidade = entidade.replace(/\s*\(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}\)\s*$/, '').trim();
+    entidade = entidade.replace(/^[–-]\s*/, '').trim();
+    if (!entidade) entidade = '-';
+
+    return {
+        id: idx,
+        orgao_sigla: orgao,
+        tipo_instrumento: tipo,
+        numero: numero || '-',
+        ano: ano || '-',
+        entidade_aderente: entidade,
+        data_publicacao: dataStr || '-',
+        data_ord: dataStr ? new Date(dataStr.split('/')[2], dataStr.split('/')[1]-1, dataStr.split('/')[0]).getTime() : 0,
+        link_ata: linkAta,
+        nome_original: nomeOriginal
+    };
+}
+
+// ============================================================
+// 4. CARREGAMENTO DOS DADOS
+// ============================================================
+function carregarDados() {
+    mostrarLoading(true, 'Carregando atas de adesão...');
+    Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        delimiter: ';',
+        skipEmptyLines: true,
+        complete: function(results) {
+            const rows = results.data.filter(r => r.nome && r.nome.trim() !== '');
+            dadosCompletos = rows.map((r, i) => parseAta(r, i));
+            mostrarLoading(false);
+            atualizarCabecalho();
+            renderizarVisaoGeral();
+            renderizarConsulta();
+            renderizarDicionario();
+            renderizarDownloads();
+            setTimeout(iframeUpdateHeight, 300);
+        },
+        error: function(err) {
+            mostrarLoading(false);
+            document.getElementById('visao-geral-content').innerHTML =
+                '<div class="filter-container text-center" style="color:#b93c42;"><i class="material-icons" style="font-size:32px;">error_outline</i><p style="margin-top:8px;font-size:13px;">Não foi possível carregar os dados do CSV. Tente novamente mais tarde.</p></div>';
+            console.error('Erro ao carregar CSV:', err);
+        }
+    });
+}
+
+function atualizarCabecalho() {
+    if (!dadosCompletos.length) return;
+    const comData = dadosCompletos.filter(d => d.data_ord > 0).sort((a,b) => b.data_ord - a.data_ord);
+    const maisRecente = comData.length ? comData[0] : null;
+    const spanData = document.getElementById('data-atualizacao-header');
+    const badge = document.getElementById('badgeAtualidade');
+
+    if (maisRecente) {
+        spanData.textContent = maisRecente.data_publicacao;
+        const dias = Math.floor((Date.now() - maisRecente.data_ord) / 86400000);
+        if (dias <= 30) {
+            badge.className = 'badge-conformidade ok';
+            badge.innerHTML = `<i class="material-icons" style="font-size:12px;">check_circle</i> Atualizado há ${dias} dia(s) (dentro do prazo de 30 dias)`;
+        } else {
+            badge.className = 'badge-conformidade alerta';
+            badge.innerHTML = `<i class="material-icons" style="font-size:12px;">warning</i> Última publicação há ${dias} dias`;
+        }
+    } else {
+        spanData.textContent = '-';
+        badge.style.display = 'none';
+    }
+}
+
+// ============================================================
+// 5. VISÃO GERAL POR ÓRGÃO
+// ============================================================
+function agruparPorOrgao() {
+    const mapa = {};
+    dadosCompletos.forEach(d => {
+        if (!mapa[d.orgao_sigla]) mapa[d.orgao_sigla] = { orgao: d.orgao_sigla, total_atas: 0, tipos: {}, anos: {} };
+        mapa[d.orgao_sigla].total_atas++;
+        mapa[d.orgao_sigla].tipos[d.tipo_instrumento] = (mapa[d.orgao_sigla].tipos[d.tipo_instrumento] || 0) + 1;
+        if (d.ano !== '-') mapa[d.orgao_sigla].anos[d.ano] = (mapa[d.orgao_sigla].anos[d.ano] || 0) + 1;
+    });
+    return Object.values(mapa);
+}
+
+function renderizarVisaoGeral() {
+    const totalAtas = dadosCompletos.length;
+    const orgaosAgrupados = agruparPorOrgao();
+    const totalOrgaos = orgaosAgrupados.length;
+    const anos = [...new Set(dadosCompletos.map(d => d.ano).filter(a => a !== '-'))].sort();
+    const anoMin = anos.length ? anos[0] : '-';
+    const anoMax = anos.length ? anos[anos.length - 1] : '-';
+    const totalArp = dadosCompletos.filter(d => d.tipo_instrumento === 'Ata de Registro de Preços').length;
+
+    const html = `
+        <div class="criterio-box" style="margin-top:15px;">
+            <h6><i class="material-icons" style="font-size:15px;">gavel</i> Item 8.5 &mdash; Divulgação da íntegra das Atas de Adesão (SRP)</h6>
+            <p>Esta seção reúne as atas de adesão / carona a registros de preços divulgadas pelos órgãos do Estado de Minas Gerais, com acesso ao arquivo original de cada ata. Cobertura de <b>${escapeHtml(anoMin)} a ${escapeHtml(anoMax)}</b>, atendendo ao critério de série histórica mínima de 3 anos.</p>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-header">Total de Atas <i class="material-icons">description</i></div>
+                    <div class="metric-body"><div class="metric-value">${totalAtas.toLocaleString('pt-BR')}</div><div class="metric-sublabel">registros na base</div></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-header">Órgãos Divulgantes <i class="material-icons">account_balance</i></div>
+                    <div class="metric-body"><div class="metric-value">${totalOrgaos}</div><div class="metric-sublabel">órgãos/entidades com atas publicadas</div></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-header">Atas de Registro de Preços <i class="material-icons">fact_check</i></div>
+                    <div class="metric-body"><div class="metric-value">${totalArp.toLocaleString('pt-BR')}</div><div class="metric-sublabel">do total, sem contar carona a pregões diversos</div></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-header">Série Histórica <i class="material-icons">history</i></div>
+                    <div class="metric-body"><div class="metric-value">${escapeHtml(anoMin)}&ndash;${escapeHtml(anoMax)}</div><div class="metric-sublabel">período coberto pelos dados</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-header"><p class="chart-title">Atas por Órgão (Top 15)</p></div>
+                    <div class="chart-wrapper"><canvas id="canvasOrgao"></canvas></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-header"><p class="chart-title">Atas por Ano de Publicação</p></div>
+                    <div class="chart-wrapper"><canvas id="canvasAno"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-12">
+                <div class="chart-container">
+                    <div class="chart-header"><p class="chart-title">Distribuição por Tipo de Instrumento</p></div>
+                    <div class="chart-wrapper" style="height:220px;"><canvas id="canvasTipo"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="table-header">
+                <p class="table-title"><i class="material-icons">table_chart</i> Atas por Órgão</p>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span class="table-badge" id="badgeVG">${totalOrgaos} órgãos</span>
+                    <button class="btn-export" onclick="exportarVGCSV()"><i class="material-icons">description</i> CSV</button>
+                </div>
+            </div>
+            <div class="table-fixed-header-container">
+                <table class="table" id="tableVG">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" onclick="ordenarVG('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarVG('total_atas')">Total de Atas <i class="material-icons">unfold_more</i></th>
+                            <th>Ata de Registro de Preços</th>
+                            <th>Pregão Eletrônico</th>
+                            <th>Outros</th>
+                            <th>% do Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyVG"></tbody>
+                </table>
+            </div>
+            <div class="pagination-container" id="paginacaoVGContainer"></div>
+        </div>
+    `;
+    document.getElementById('visao-geral-content').innerHTML = html;
+
+    renderizarTabelaVG(orgaosAgrupados, totalAtas);
+    renderizarGraficosVG(orgaosAgrupados, anos);
+}
+
+function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
+    let dados = [...orgaosAgrupados];
+    dados.sort((a,b) => {
+        let va = a[sortConfigVG.coluna], vb = b[sortConfigVG.coluna];
+        if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+        if (va < vb) return sortConfigVG.direcao === 'asc' ? -1 : 1;
+        if (va > vb) return sortConfigVG.direcao === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const totalPaginas = Math.max(1, Math.ceil(dados.length / paginacaoVG.itensPorPagina));
+    if (paginacaoVG.paginaAtual > totalPaginas) paginacaoVG.paginaAtual = totalPaginas;
+    const inicio = (paginacaoVG.paginaAtual - 1) * paginacaoVG.itensPorPagina;
+    const pagina = dados.slice(inicio, inicio + paginacaoVG.itensPorPagina);
+
+    document.getElementById('tbodyVG').innerHTML = pagina.map(o => {
+        const arp = o.tipos['Ata de Registro de Preços'] || 0;
+        const preg = (o.tipos['Pregão Eletrônico'] || 0) + (o.tipos['Pregão Presencial'] || 0);
+        const outros = o.total_atas - arp - preg;
+        const pct = totalAtas ? ((o.total_atas / totalAtas) * 100).toFixed(1) : '0.0';
+        return `<tr>
+            <td><a class="orgao-link" onclick="filtrarPorOrgaoENavegar('${escapeHtml(o.orgao)}')">${escapeHtml(o.orgao)}</a></td>
+            <td><b>${o.total_atas}</b></td>
+            <td>${arp}</td>
+            <td>${preg}</td>
+            <td>${outros}</td>
+            <td>${pct}%</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6" class="text-center nao-aplica">Nenhum registro encontrado.</td></tr>';
+
+    document.getElementById('badgeVG').textContent = `${dados.length} órgãos`;
+    window.vgAgrupadosOrdenados = dados;
+
+    const cont = document.getElementById('paginacaoVGContainer');
+    cont.innerHTML = `
+        <div class="pagination-info">Mostrando ${dados.length ? inicio+1 : 0}–${Math.min(inicio+paginacaoVG.itensPorPagina, dados.length)} de ${dados.length}
+            <div class="page-size-selector">Por página:
+                <select onchange="paginacaoVG.itensPorPagina=parseInt(this.value);paginacaoVG.paginaAtual=1;renderizarTabelaVG(agruparPorOrgao(), ${totalAtas});">
+                    <option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option>
+                </select>
+            </div>
+        </div>
+        <div class="pagination-controls">
+            <button onclick="mudarPaginaVG(1, ${totalAtas})" ${paginacaoVG.paginaAtual===1?'disabled':''}>&laquo;</button>
+            <button onclick="mudarPaginaVG(${paginacaoVG.paginaAtual-1}, ${totalAtas})" ${paginacaoVG.paginaAtual===1?'disabled':''}>&lsaquo;</button>
+            <span style="font-size:12px;padding:0 8px;">Página ${paginacaoVG.paginaAtual} de ${totalPaginas}</span>
+            <button onclick="mudarPaginaVG(${paginacaoVG.paginaAtual+1}, ${totalAtas})" ${paginacaoVG.paginaAtual===totalPaginas?'disabled':''}>&rsaquo;</button>
+            <button onclick="mudarPaginaVG(${totalPaginas}, ${totalAtas})" ${paginacaoVG.paginaAtual===totalPaginas?'disabled':''}>&raquo;</button>
+        </div>`;
+}
+window.mudarPaginaVG = function(p, totalAtas) { paginacaoVG.paginaAtual = p; renderizarTabelaVG(agruparPorOrgao(), totalAtas); };
+window.ordenarVG = function(coluna) {
+    if (sortConfigVG.coluna === coluna) sortConfigVG.direcao = sortConfigVG.direcao === 'asc' ? 'desc' : 'asc';
+    else { sortConfigVG.coluna = coluna; sortConfigVG.direcao = 'desc'; }
+    renderizarTabelaVG(agruparPorOrgao(), dadosCompletos.length);
+};
+window.filtrarPorOrgaoENavegar = function(orgao) {
+    document.getElementById('consulta-tab').click();
+    setTimeout(() => {
+        const sel = document.getElementById('filtroOrgaoCI');
+        if (sel) { sel.value = orgao; aplicarFiltrosCI(); }
+    }, 150);
+};
+window.exportarVGCSV = function() {
+    const dados = window.vgAgrupadosOrdenados || agruparPorOrgao();
+    const csv = [['Órgão','Total de Atas','Ata de Registro de Preços','Pregão Eletrônico','Outros'].join(';'),
+        ...dados.map(o => {
+            const arp = o.tipos['Ata de Registro de Preços'] || 0;
+            const preg = (o.tipos['Pregão Eletrônico'] || 0) + (o.tipos['Pregão Presencial'] || 0);
+            const outros = o.total_atas - arp - preg;
+            return [o.orgao, o.total_atas, arp, preg, outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';');
+        })
+    ].join('\n');
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'atas_por_orgao.csv'; a.click();
+};
+
+function renderizarGraficosVG(orgaosAgrupados, anos) {
+    // Gráfico por órgão (top 15)
+    const topOrgaos = [...orgaosAgrupados].sort((a,b) => b.total_atas - a.total_atas).slice(0, 15);
+    if (chartOrgao) chartOrgao.destroy();
+    chartOrgao = new Chart(document.getElementById('canvasOrgao'), {
+        type: 'bar',
+        data: {
+            labels: topOrgaos.map(o => o.orgao),
+            datasets: [{ label: 'Nº de Atas', data: topOrgaos.map(o => o.total_atas), backgroundColor: '#1a3a5c', borderRadius: 4 }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+
+    // Gráfico por ano
+    const contagemAno = {};
+    anos.forEach(a => contagemAno[a] = 0);
+    dadosCompletos.forEach(d => { if (d.ano !== '-') contagemAno[d.ano] = (contagemAno[d.ano] || 0) + 1; });
+    const anosOrdenados = Object.keys(contagemAno).sort();
+    if (chartAno) chartAno.destroy();
+    chartAno = new Chart(document.getElementById('canvasAno'), {
+        type: 'bar',
+        data: {
+            labels: anosOrdenados,
+            datasets: [{ label: 'Nº de Atas', data: anosOrdenados.map(a => contagemAno[a]), backgroundColor: '#b93c42', borderRadius: 4 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+
+    // Gráfico por tipo
+    const contagemTipo = {};
+    dadosCompletos.forEach(d => { contagemTipo[d.tipo_instrumento] = (contagemTipo[d.tipo_instrumento] || 0) + 1; });
+    const tiposOrdenados = Object.entries(contagemTipo).sort((a,b) => b[1]-a[1]);
+    if (chartTipo) chartTipo.destroy();
+    chartTipo = new Chart(document.getElementById('canvasTipo'), {
+        type: 'bar',
+        data: {
+            labels: tiposOrdenados.map(t => t[0]),
+            datasets: [{ label: 'Nº de Atas', data: tiposOrdenados.map(t => t[1]), backgroundColor: chartPalette, borderRadius: 4 }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+}
+
+// ============================================================
+// 6. CONSULTA INDIVIDUAL
+// ============================================================
+function renderizarConsulta() {
+    const orgaos = [...new Set(dadosCompletos.map(d => d.orgao_sigla))].sort();
+    const tipos = [...new Set(dadosCompletos.map(d => d.tipo_instrumento))].sort();
+    const anos = [...new Set(dadosCompletos.map(d => d.ano).filter(a => a !== '-'))].sort().reverse();
+
+    const html = `
+        <div class="filter-container" style="margin-top:15px;">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <div class="filter-label">Órgão</div>
+                    <select class="modern-select" id="filtroOrgaoCI"><option value="">Todos</option>${orgaos.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}</select>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Tipo de Instrumento</div>
+                    <select class="modern-select" id="filtroTipoCI"><option value="">Todos</option>${tipos.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}</select>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Ano</div>
+                    <select class="modern-select" id="filtroAnoCI"><option value="">Todos</option>${anos.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select>
+                </div>
+                <div class="filter-group" style="flex:2;min-width:220px;">
+                    <div class="filter-label">Pesquisa Livre</div>
+                    <input type="text" class="form-control" id="filtroTextoCI" placeholder="Órgão, número da ata, entidade aderente...">
+                </div>
+            </div>
+            <div class="botoes-abaixo">
+                <button class="btn-pesquisa" onclick="aplicarFiltrosCI()"><i class="material-icons">search</i> Pesquisar</button>
+                <button class="btn-secondary-custom" onclick="limparFiltrosCI()"><i class="material-icons">restart_alt</i> Limpar Filtros</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="table-header">
+                <p class="table-title"><i class="material-icons">fact_check</i> Atas de Adesão / Carona</p>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span class="table-badge" id="badgeCI">0 registros</span>
+                    <button class="btn-export" onclick="exportarCICSV()"><i class="material-icons">description</i> CSV</button>
+                </div>
+            </div>
+            <div class="table-fixed-header-container">
+                <table class="table" id="tableCI">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" onclick="ordenarCI('ano')">Ano <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('orgao_sigla')">Órgão <i class="material-icons">unfold_more</i></th>
+                            <th>Tipo</th>
+                            <th>Número</th>
+                            <th>Entidade Aderente (Carona)</th>
+                            <th class="sortable-header" onclick="ordenarCI('data_ord')">Data <i class="material-icons">unfold_more</i></th>
+                            <th>Ata</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyCI"></tbody>
+                </table>
+            </div>
+            <div class="pagination-container" id="paginacaoCIContainer"></div>
+        </div>
+    `;
+    document.getElementById('consulta-content').innerHTML = html;
+    aplicarFiltrosCI();
+}
+
+window.aplicarFiltrosCI = function() {
+    const orgao = document.getElementById('filtroOrgaoCI').value;
+    const tipo = document.getElementById('filtroTipoCI').value;
+    const ano = document.getElementById('filtroAnoCI').value;
+    const texto = document.getElementById('filtroTextoCI').value.trim().toLowerCase();
+
+    dadosFiltradosCI = dadosCompletos.filter(d => {
+        if (orgao && d.orgao_sigla !== orgao) return false;
+        if (tipo && d.tipo_instrumento !== tipo) return false;
+        if (ano && d.ano !== ano) return false;
+        if (texto) {
+            const alvo = `${d.orgao_sigla} ${d.numero} ${d.entidade_aderente} ${d.nome_original}`.toLowerCase();
+            if (!alvo.includes(texto)) return false;
+        }
+        return true;
+    });
+    paginacaoCI.paginaAtual = 1;
+    renderizarTabelaCI();
+};
+
+window.limparFiltrosCI = function() {
+    document.getElementById('filtroOrgaoCI').value = '';
+    document.getElementById('filtroTipoCI').value = '';
+    document.getElementById('filtroAnoCI').value = '';
+    document.getElementById('filtroTextoCI').value = '';
+    aplicarFiltrosCI();
+};
+
+window.ordenarCI = function(coluna) {
+    if (sortConfigCI.coluna === coluna) sortConfigCI.direcao = sortConfigCI.direcao === 'asc' ? 'desc' : 'asc';
+    else { sortConfigCI.coluna = coluna; sortConfigCI.direcao = coluna === 'data_ord' ? 'desc' : 'asc'; }
+    renderizarTabelaCI();
+};
+
+function renderizarTabelaCI() {
+    let dados = [...dadosFiltradosCI];
+    dados.sort((a,b) => {
+        let va = a[sortConfigCI.coluna], vb = b[sortConfigCI.coluna];
+        if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+        if (va < vb) return sortConfigCI.direcao === 'asc' ? -1 : 1;
+        if (va > vb) return sortConfigCI.direcao === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const totalPaginas = Math.max(1, Math.ceil(dados.length / paginacaoCI.itensPorPagina));
+    if (paginacaoCI.paginaAtual > totalPaginas) paginacaoCI.paginaAtual = totalPaginas;
+    const inicio = (paginacaoCI.paginaAtual - 1) * paginacaoCI.itensPorPagina;
+    const pagina = dados.slice(inicio, inicio + paginacaoCI.itensPorPagina);
+
+    document.getElementById('tbodyCI').innerHTML = pagina.map(d => `
+        <tr>
+            <td>${escapeHtml(d.ano)}</td>
+            <td>${escapeHtml(d.orgao_sigla)}</td>
+            <td><span class="badge-tipo ${getBadgeTipo(d.tipo_instrumento)}">${escapeHtml(d.tipo_instrumento)}</span></td>
+            <td>${escapeHtml(d.numero)}</td>
+            <td><a class="ata-link" onclick="abrirModalAta(${d.id})">${escapeHtml(d.entidade_aderente)}</a></td>
+            <td>${escapeHtml(d.data_publicacao)}</td>
+            <td>${d.link_ata ? `<a class="ata-link" href="${escapeHtml(d.link_ata)}" target="_blank" rel="noopener"><i class="material-icons">picture_as_pdf</i> Abrir</a>` : '<span class="nao-aplica">Não disponível</span>'}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="7" class="text-center nao-aplica">Nenhuma ata encontrada com os filtros aplicados.</td></tr>';
+
+    document.getElementById('badgeCI').textContent = `${dados.length} registros`;
+
+    const cont = document.getElementById('paginacaoCIContainer');
+    cont.innerHTML = `
+        <div class="pagination-info">Mostrando ${dados.length ? inicio+1 : 0}–${Math.min(inicio+paginacaoCI.itensPorPagina, dados.length)} de ${dados.length}
+            <div class="page-size-selector">Por página:
+                <select onchange="paginacaoCI.itensPorPagina=parseInt(this.value);paginacaoCI.paginaAtual=1;renderizarTabelaCI();">
+                    <option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option>
+                </select>
+            </div>
+        </div>
+        <div class="pagination-controls">
+            <button onclick="mudarPaginaCI(1)" ${paginacaoCI.paginaAtual===1?'disabled':''}>&laquo;</button>
+            <button onclick="mudarPaginaCI(${paginacaoCI.paginaAtual-1})" ${paginacaoCI.paginaAtual===1?'disabled':''}>&lsaquo;</button>
+            <span style="font-size:12px;padding:0 8px;">Página ${paginacaoCI.paginaAtual} de ${totalPaginas}</span>
+            <button onclick="mudarPaginaCI(${paginacaoCI.paginaAtual+1})" ${paginacaoCI.paginaAtual===totalPaginas?'disabled':''}>&rsaquo;</button>
+            <button onclick="mudarPaginaCI(${totalPaginas})" ${paginacaoCI.paginaAtual===totalPaginas?'disabled':''}>&raquo;</button>
+        </div>`;
+}
+window.mudarPaginaCI = function(p) { paginacaoCI.paginaAtual = p; renderizarTabelaCI(); };
+
+window.abrirModalAta = function(id) {
+    const d = dadosCompletos.find(x => x.id === id);
+    if (!d) return;
+    modalAtaAtual = d;
+    document.getElementById('modalContent').innerHTML = `
+        <div class="row g-2">
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Órgão</div><div class="info-value">${escapeHtml(d.orgao_sigla)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Tipo de Instrumento</div><div class="info-value">${escapeHtml(d.tipo_instrumento)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Número</div><div class="info-value highlight">${escapeHtml(d.numero)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Ano</div><div class="info-value">${escapeHtml(d.ano)}</div></div></div>
+            <div class="col-md-12"><div class="info-item"><div class="info-label">Entidade Aderente (Carona)</div><div class="info-value">${escapeHtml(d.entidade_aderente)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Data de Publicação</div><div class="info-value">${escapeHtml(d.data_publicacao)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Link da Ata (PDF)</div><div class="info-value">${d.link_ata ? `<a href="${escapeHtml(d.link_ata)}" target="_blank" rel="noopener">${escapeHtml(d.link_ata)}</a>` : '<span class="nao-aplica">Não disponível</span>'}</div></div></div>
+            <div class="col-md-12"><div class="info-item"><div class="info-label">Descrição Original</div><div class="info-value">${escapeHtml(d.nome_original)}</div></div></div>
+        </div>`;
+    const btnAbrir = document.getElementById('btnAbrirAtaModal');
+    if (d.link_ata) { btnAbrir.style.display = 'inline-flex'; btnAbrir.onclick = () => window.open(d.link_ata, '_blank'); }
+    else { btnAbrir.style.display = 'none'; }
+
+    window.__modalAberto = true;
+    const modalEl = document.getElementById('detailModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    modalEl.addEventListener('hidden.bs.modal', () => { window.__modalAberto = false; setTimeout(iframeUpdateHeight, 200); }, { once: true });
+};
+
+window.exportarCICSV = function() {
+    const dados = dadosFiltradosCI.length ? dadosFiltradosCI : dadosCompletos;
+    const csv = [['Ano','Órgão','Tipo de Instrumento','Número','Entidade Aderente (Carona)','Data de Publicação','Link da Ata'].join(';'),
+        ...dados.map(d => [d.ano, d.orgao_sigla, d.tipo_instrumento, d.numero, d.entidade_aderente, d.data_publicacao, d.link_ata]
+            .map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';'))
+    ].join('\n');
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'atas_registro_precos.csv'; a.click();
+};
+
+// ============================================================
+// 7. DICIONÁRIO DE DADOS
+// ============================================================
+function renderizarDicionario() {
+    const html = `
+        <div class="metadata-container" style="margin-top:15px;">
+            <div class="metadata-header"><i class="material-icons">menu_book</i> Dicionário de Dados</div>
+            <div style="padding:16px;">
+                <table class="metadata-table">
+                    <thead><tr><th>Campo (Dashboard)</th><th>Origem no CSV</th><th>Descrição</th><th>Exemplo</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>ano</code></td><td>Extraído do campo <code>nome</code></td><td>Ano de publicação da ata de adesão, obtido a partir da data indicada ao final da descrição ou do número do instrumento.</td><td>2023</td></tr>
+                        <tr><td><code>orgao_sigla</code></td><td>Extraído do campo <code>nome</code></td><td>Sigla do órgão ou entidade estadual que divulgou a ata (primeiro segmento do texto).</td><td>PMMG</td></tr>
+                        <tr><td><code>tipo_instrumento</code></td><td>Extraído do campo <code>nome</code></td><td>Tipo do instrumento licitatório de origem: Ata de Registro de Preços, Pregão Eletrônico, Pregão Presencial, entre outros.</td><td>Ata de Registro de Preços</td></tr>
+                        <tr><td><code>numero</code></td><td>Extraído do campo <code>nome</code></td><td>Número/exercício do instrumento (Nº/Ano).</td><td>060/2023</td></tr>
+                        <tr><td><code>entidade_aderente</code></td><td>Extraído do campo <code>nome</code> (trecho após "Gestor")</td><td>Órgão, entidade ou consórcio que aderiu (pegou carona) à ata do órgão gestor.</td><td>Prefeitura Municipal de Ibirité</td></tr>
+                        <tr><td><code>data_publicacao</code></td><td>Extraído do campo <code>nome</code></td><td>Data de divulgação da adesão, no formato dd/mm/aaaa.</td><td>27/12/2023</td></tr>
+                        <tr><td><code>link_ata</code></td><td><code>arquivo</code></td><td>Link direto para o arquivo PDF com a íntegra da ata de adesão.</td><td>https://compras.mg.gov.br/wp-content/uploads/...pdf</td></tr>
+                        <tr><td colspan="4" style="color:#94a3b8;font-style:italic;">A coluna <code>pagina</code> do arquivo-fonte (link da página de listagem) foi desconsiderada, conforme solicitado.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="metadata-container">
+            <div class="metadata-header"><i class="material-icons">rule</i> Critérios de Conformidade (Item 8.5)</div>
+            <div style="padding:16px;">
+                <div class="criterio-box">
+                    <h6><i class="material-icons" style="font-size:15px;">event_available</i> Atualidade</h6>
+                    <p>As informações são consideradas atualizadas quando a ata mais recente disponível tiver sido divulgada em, no máximo, 30 dias em relação à data da consulta. O indicador é exibido automaticamente no topo do painel.</p>
+                </div>
+                <div class="criterio-box">
+                    <h6><i class="material-icons" style="font-size:15px;">history</i> Série Histórica</h6>
+                    <p>Considera-se existente o histórico de informações quando os dados disponibilizados cobrirem, no mínimo, os 3 anos anteriores ao da pesquisa. A aba "Visão Geral por Órgão" exibe o período total coberto pela base.</p>
+                </div>
+                <div class="criterio-box">
+                    <h6><i class="material-icons" style="font-size:15px;">filter_alt</i> Filtro de Pesquisa</h6>
+                    <p>A aba "Consulta Individual" permite filtrar as atas por órgão, tipo de instrumento, ano de publicação e por texto livre (pesquisa em órgão, número da ata e entidade aderente).</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="metadata-container">
+            <div class="metadata-header"><i class="material-icons">source</i> Fonte dos Dados</div>
+            <div style="padding:16px;font-size:12.5px;color:#334155;line-height:1.6;">
+                Dados extraídos do repositório público
+                <a href="${REPO_URL}" target="_blank" rel="noopener">transparencia-mg/portal_registro_precos</a>,
+                arquivo <code>dataset/data/atas.csv</code>, mantido a partir das publicações do
+                <a href="https://compras.mg.gov.br/acesso-a-informacoes/consultas/divulgacao-adesao-carona/" target="_blank" rel="noopener">Portal de Compras do Estado de Minas Gerais</a>.
+            </div>
+        </div>
+    `;
+    document.getElementById('dicionario-content').innerHTML = html;
+}
+
+// ============================================================
+// 8. DOWNLOADS
+// ============================================================
+function renderizarDownloads() {
+    const html = `
+        <div class="row g-3" style="margin-top:15px;">
+            <div class="col-md-4">
+                <div class="btn-download-card">
+                    <div class="dl-icon"><i class="material-icons">table_view</i></div>
+                    <h6>Base Completa (CSV)</h6>
+                    <p>Todas as atas de adesão / carona a registros de preços já tratadas, no formato original do repositório de dados abertos.</p>
+                    <button class="btn-pesquisa" onclick="exportarCICSV()"><i class="material-icons">download</i> Baixar CSV (dados filtrados/completos)</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="btn-download-card">
+                    <div class="dl-icon"><i class="material-icons">summarize</i></div>
+                    <h6>Resumo por Órgão (CSV)</h6>
+                    <p>Quantitativo de atas de adesão publicadas por órgão, segmentado por tipo de instrumento.</p>
+                    <button class="btn-pesquisa" onclick="exportarVGCSV()"><i class="material-icons">download</i> Baixar Resumo por Órgão</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="btn-download-card">
+                    <div class="dl-icon"><i class="material-icons">code</i></div>
+                    <h6>Repositório de Dados Abertos</h6>
+                    <p>Acesse o CSV-fonte, o histórico de versões e a documentação completa do conjunto de dados no GitHub.</p>
+                    <a class="btn-secondary-custom" href="${REPO_URL}" target="_blank" rel="noopener"><i class="material-icons">open_in_new</i> Abrir Repositório</a>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('downloads-content').innerHTML = html;
+}
+
+// ============================================================
+// 9. INICIALIZAÇÃO
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+    carregarDados();
+
+    const detailModal = document.getElementById('detailModal');
+    if (detailModal) {
+        let savedScrollY = 0;
+        detailModal.addEventListener('show.bs.modal', () => { savedScrollY = window.scrollY; });
+        detailModal.addEventListener('shown.bs.modal', () => {
+            document.body.style.paddingRight = '0px';
+            document.body.style.overflow = 'auto';
+            document.body.style.position = 'static';
+            window.scrollTo(0, savedScrollY);
+        });
+        detailModal.addEventListener('hidden.bs.modal', () => {
+            document.body.style.paddingRight = '';
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            window.scrollTo(0, savedScrollY);
+            setTimeout(iframeUpdateHeight, 200);
+        });
+    }
+
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', () => setTimeout(iframeUpdateHeight, 300));
+    });
+    window.addEventListener('resize', () => { clearTimeout(window.resizeTimer); window.resizeTimer = setTimeout(iframeUpdateHeight, 250); });
+});
+
+// Iframe resize observer - debounced
+(function() {
+    let lastHeight = 0;
+    let sendTimer = null;
+    function sendHeight() {
+        clearTimeout(sendTimer);
+        sendTimer = setTimeout(function() {
+            if (window.__modalAberto) return;
+            const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) + 20;
+            if (h !== lastHeight) {
+                lastHeight = h;
+                try { if (window.parent && window.parent !== window) window.parent.postMessage({ iframeHeight: h, height: h, type: 'resize' }, '*'); } catch(e) {}
+            }
+        }, 100);
+    }
+    if (window.ResizeObserver) {
+        let roTimer = null;
+        const ro = new ResizeObserver(function() { clearTimeout(roTimer); roTimer = setTimeout(sendHeight, 150); });
+        ro.observe(document.body);
+    } else {
+        window.addEventListener('resize', sendHeight);
+    }
+    setTimeout(sendHeight, 500);
+})();
+</script>
+</body>
+</html>
