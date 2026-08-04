@@ -1,0 +1,38 @@
+{
+  "name": "portal_registro_precos",
+  "owner_org": "",
+  "profile": "data-package",
+  "resources": [
+    {
+      "description": "Insira a descrição/explicação detalhada deste recurso.",
+      "dialect": {
+        "delimiter": ";"
+      },
+      "encoding": "utf-8-sig",
+      "format": "csv",
+      "hashing": "md5",
+      "name": "atas",
+      "path": "data/atas.csv",
+      "profile": "tabular-data-resource",
+      "schema": {
+        "fields": [
+          {
+            "name": "pagina",
+            "type": "string"
+          },
+          {
+            "name": "nome",
+            "type": "string"
+          },
+          {
+            "name": "arquivo",
+            "type": "string"
+          }
+        ]
+      },
+      "scheme": "file",
+      "title": "Insira um título humanamente legível para este recurso."
+    }
+  ],
+  "title": "Portal_registro_precos"
+}
