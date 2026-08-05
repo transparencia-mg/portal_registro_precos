@@ -397,7 +397,7 @@
             <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
                 <li class="nav-item">
                     <button class="nav-link active" id="visao-geral-tab" data-bs-toggle="tab" data-bs-target="#visao-geral">
-                        <i class="material-icons">bar_chart</i>Visão Geral por Órgão
+                        <i class="material-icons">bar_chart</i>Visão Geral
                     </button>
                 </li>
                 <li class="nav-item">
@@ -486,8 +486,8 @@ let dadosCompletos = [];   // uma linha por ata (já parseada)
 let dadosFiltradosCI = [];
 let modalAtaAtual = null;
 
-let sortConfigVG = { coluna: 'total_atas', direcao: 'desc' };
-let sortConfigCI = { coluna: 'data_ord', direcao: 'desc' };
+let sortConfigVG = { coluna: 'orgao', direcao: 'asc' };
+let sortConfigCI = { coluna: 'orgao', direcao: 'asc' };
 
 let paginacaoVG = { paginaAtual: 1, itensPorPagina: 25 };
 let paginacaoCI = { paginaAtual: 1, itensPorPagina: 25 };
@@ -629,11 +629,23 @@ function atualizarCabecalho() {
 }
 
 // ============================================================
-// 5. VISÃO GERAL POR ÓRGÃO
+// 5. VISÃO GERAL
 // ============================================================
-function agruparPorOrgao() {
+let filtrosVG = { ano: '', orgao: '', sigla: '' };
+
+function obterDadosFiltradosVG() {
+    return dadosCompletos.filter(d => {
+        if (filtrosVG.ano && d.ano !== filtrosVG.ano) return false;
+        if (filtrosVG.orgao && d.orgao !== filtrosVG.orgao) return false;
+        if (filtrosVG.sigla && d.sigla !== filtrosVG.sigla) return false;
+        return true;
+    });
+}
+
+function agruparPorOrgao(dados) {
+    const base = dados || dadosCompletos;
     const mapa = {};
-    dadosCompletos.forEach(d => {
+    base.forEach(d => {
         if (!mapa[d.sigla]) mapa[d.sigla] = { sigla: d.sigla, orgao: d.orgao, total_atas: 0, tipos: {}, anos: {} };
         mapa[d.sigla].total_atas++;
         if (mapa[d.sigla].orgao === '-' && d.orgao !== '-') mapa[d.sigla].orgao = d.orgao;
@@ -644,15 +656,42 @@ function agruparPorOrgao() {
 }
 
 function renderizarVisaoGeral() {
-    const totalAtas = dadosCompletos.length;
-    const orgaosAgrupados = agruparPorOrgao();
+    const dadosBase = obterDadosFiltradosVG();
+    const totalAtas = dadosBase.length;
+    const orgaosAgrupados = agruparPorOrgao(dadosBase);
     const totalOrgaos = orgaosAgrupados.length;
-    const anos = [...new Set(dadosCompletos.map(d => d.ano).filter(a => a !== '-'))].sort();
-    const anoMin = anos.length ? anos[0] : '-';
-    const anoMax = anos.length ? anos[anos.length - 1] : '-';
-    const totalArp = dadosCompletos.filter(d => d.tipo_instrumento === 'Ata de Registro de Preços').length;
+    const anosBase = [...new Set(dadosBase.map(d => d.ano).filter(a => a !== '-'))].sort();
+    const anoMin = anosBase.length ? anosBase[0] : '-';
+    const anoMax = anosBase.length ? anosBase[anosBase.length - 1] : '-';
+    const totalArp = dadosBase.filter(d => d.tipo_instrumento === 'Ata de Registro de Preços').length;
+
+    // Opções de filtro sempre construídas a partir da base completa de dados
+    const anosOpcoes = [...new Set(dadosCompletos.map(d => d.ano).filter(a => a !== '-'))].sort().reverse();
+    const orgaosOpcoes = [...new Set(dadosCompletos.map(d => d.orgao).filter(o => o !== '-'))].sort();
+    const siglasOpcoes = [...new Set(dadosCompletos.map(d => d.sigla))].sort();
 
     const html = `
+        <div class="filter-container" style="margin-top:15px;">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <div class="filter-label">Ano</div>
+                    <select class="modern-select" id="filtroAnoVG"><option value="">Todos</option>${anosOpcoes.map(a=>`<option value="${escapeHtml(a)}" ${filtrosVG.ano===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}</select>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Órgão</div>
+                    <select class="modern-select" id="filtroOrgaoVG"><option value="">Todos</option>${orgaosOpcoes.map(o=>`<option value="${escapeHtml(o)}" ${filtrosVG.orgao===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Sigla</div>
+                    <select class="modern-select" id="filtroSiglaVG"><option value="">Todas</option>${siglasOpcoes.map(s=>`<option value="${escapeHtml(s)}" ${filtrosVG.sigla===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>
+                </div>
+            </div>
+            <div class="botoes-abaixo">
+                <button class="btn-pesquisa" onclick="aplicarFiltrosVG()"><i class="material-icons">refresh</i> Atualizar Filtros</button>
+                <button class="btn-secondary-custom" onclick="limparFiltrosVG()"><i class="material-icons">restart_alt</i> Limpar Filtros</button>
+            </div>
+        </div>
+
         <div class="row g-3 mb-3">
             <div class="col-md-3">
                 <div class="metric-card">
@@ -703,10 +742,10 @@ function renderizarVisaoGeral() {
                             <th class="sortable-header" onclick="ordenarVG('sigla')">Sigla <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarVG('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('total_atas')">Total de Atas <i class="material-icons">unfold_more</i></th>
-                            <th style="text-align:center;">Ata de Registro de Preços</th>
-                            <th style="text-align:center;">Pregão Eletrônico</th>
-                            <th style="text-align:center;">Outros</th>
-                            <th style="text-align:center;">% do Total</th>
+                            <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('arp')">Ata de Registro de Preços <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('preg')">Pregão Eletrônico <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('outros')">Outros <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('pct')">% do Total <i class="material-icons">unfold_more</i></th>
                         </tr>
                     </thead>
                     <tbody id="tbodyVG"></tbody>
@@ -718,11 +757,31 @@ function renderizarVisaoGeral() {
     document.getElementById('visao-geral-content').innerHTML = html;
 
     renderizarTabelaVG(orgaosAgrupados, totalAtas);
-    renderizarGraficosVG(orgaosAgrupados, anos);
+    renderizarGraficosVG(orgaosAgrupados, dadosBase, anosBase);
 }
 
+window.aplicarFiltrosVG = function() {
+    filtrosVG.ano = document.getElementById('filtroAnoVG').value;
+    filtrosVG.orgao = document.getElementById('filtroOrgaoVG').value;
+    filtrosVG.sigla = document.getElementById('filtroSiglaVG').value;
+    paginacaoVG.paginaAtual = 1;
+    renderizarVisaoGeral();
+};
+
+window.limparFiltrosVG = function() {
+    filtrosVG = { ano: '', orgao: '', sigla: '' };
+    paginacaoVG.paginaAtual = 1;
+    renderizarVisaoGeral();
+};
+
 function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
-    let dados = [...orgaosAgrupados];
+    let dados = orgaosAgrupados.map(o => {
+        const arp = o.tipos['Ata de Registro de Preços'] || 0;
+        const preg = (o.tipos['Pregão Eletrônico'] || 0) + (o.tipos['Pregão Presencial'] || 0);
+        const outros = o.total_atas - arp - preg;
+        const pct = totalAtas ? (o.total_atas / totalAtas) * 100 : 0;
+        return { ...o, arp, preg, outros, pct };
+    });
     dados.sort((a,b) => {
         let va = a[sortConfigVG.coluna], vb = b[sortConfigVG.coluna];
         if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
@@ -736,21 +795,15 @@ function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
     const inicio = (paginacaoVG.paginaAtual - 1) * paginacaoVG.itensPorPagina;
     const pagina = dados.slice(inicio, inicio + paginacaoVG.itensPorPagina);
 
-    document.getElementById('tbodyVG').innerHTML = pagina.map(o => {
-        const arp = o.tipos['Ata de Registro de Preços'] || 0;
-        const preg = (o.tipos['Pregão Eletrônico'] || 0) + (o.tipos['Pregão Presencial'] || 0);
-        const outros = o.total_atas - arp - preg;
-        const pct = totalAtas ? ((o.total_atas / totalAtas) * 100).toFixed(1) : '0.0';
-        return `<tr>
+    document.getElementById('tbodyVG').innerHTML = pagina.map(o => `<tr>
             <td><a class="orgao-link" onclick="filtrarPorOrgaoENavegar('${escapeHtml(o.sigla)}')">${escapeHtml(o.sigla)}</a></td>
             <td>${escapeHtml(o.orgao)}</td>
             <td style="text-align:center;"><b>${o.total_atas}</b></td>
-            <td style="text-align:center;">${arp}</td>
-            <td style="text-align:center;">${preg}</td>
-            <td style="text-align:center;">${outros}</td>
-            <td style="text-align:center;">${pct}%</td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="7" class="text-center nao-aplica">Nenhum registro encontrado.</td></tr>';
+            <td style="text-align:center;">${o.arp}</td>
+            <td style="text-align:center;">${o.preg}</td>
+            <td style="text-align:center;">${o.outros}</td>
+            <td style="text-align:center;">${o.pct.toFixed(1)}%</td>
+        </tr>`).join('') || '<tr><td colspan="7" class="text-center nao-aplica">Nenhum registro encontrado.</td></tr>';
 
     window.vgAgrupadosOrdenados = dados;
 
@@ -758,7 +811,7 @@ function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
     cont.innerHTML = `
         <div class="pagination-info">Mostrando ${dados.length ? inicio+1 : 0}–${Math.min(inicio+paginacaoVG.itensPorPagina, dados.length)} de ${dados.length}
             <div class="page-size-selector">Por página:
-                <select onchange="paginacaoVG.itensPorPagina=parseInt(this.value);paginacaoVG.paginaAtual=1;renderizarTabelaVG(agruparPorOrgao(), ${totalAtas});">
+                <select onchange="paginacaoVG.itensPorPagina=parseInt(this.value);paginacaoVG.paginaAtual=1;renderizarTabelaVG(agruparPorOrgao(obterDadosFiltradosVG()), ${totalAtas});">
                     <option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option>
                 </select>
             </div>
@@ -771,34 +824,29 @@ function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
             <button onclick="mudarPaginaVG(${totalPaginas}, ${totalAtas})" ${paginacaoVG.paginaAtual===totalPaginas?'disabled':''}>&raquo;</button>
         </div>`;
 }
-window.mudarPaginaVG = function(p, totalAtas) { paginacaoVG.paginaAtual = p; renderizarTabelaVG(agruparPorOrgao(), totalAtas); };
+window.mudarPaginaVG = function(p, totalAtas) { paginacaoVG.paginaAtual = p; renderizarTabelaVG(agruparPorOrgao(obterDadosFiltradosVG()), totalAtas); };
 window.ordenarVG = function(coluna) {
     if (sortConfigVG.coluna === coluna) sortConfigVG.direcao = sortConfigVG.direcao === 'asc' ? 'desc' : 'asc';
-    else { sortConfigVG.coluna = coluna; sortConfigVG.direcao = 'desc'; }
-    renderizarTabelaVG(agruparPorOrgao(), dadosCompletos.length);
+    else { sortConfigVG.coluna = coluna; sortConfigVG.direcao = 'asc'; }
+    renderizarTabelaVG(agruparPorOrgao(obterDadosFiltradosVG()), obterDadosFiltradosVG().length);
 };
-window.filtrarPorOrgaoENavegar = function(orgao) {
+window.filtrarPorOrgaoENavegar = function(sigla) {
     document.getElementById('consulta-tab').click();
     setTimeout(() => {
         const sel = document.getElementById('filtroOrgaoCI');
-        if (sel) { sel.value = orgao; aplicarFiltrosCI(); }
+        if (sel) { sel.value = sigla; aplicarFiltrosCI(); }
     }, 150);
 };
 window.exportarVGCSV = function() {
-    const dados = window.vgAgrupadosOrdenados || agruparPorOrgao();
+    const dados = window.vgAgrupadosOrdenados || agruparPorOrgao(obterDadosFiltradosVG());
     const csv = [['Sigla','Órgão','Total de Atas','Ata de Registro de Preços','Pregão Eletrônico','Outros'].join(';'),
-        ...dados.map(o => {
-            const arp = o.tipos['Ata de Registro de Preços'] || 0;
-            const preg = (o.tipos['Pregão Eletrônico'] || 0) + (o.tipos['Pregão Presencial'] || 0);
-            const outros = o.total_atas - arp - preg;
-            return [o.sigla, o.orgao, o.total_atas, arp, preg, outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';');
-        })
+        ...dados.map(o => [o.sigla, o.orgao, o.total_atas, o.arp, o.preg, o.outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';'))
     ].join('\n');
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'atas_por_orgao.csv'; a.click();
 };
 
-function renderizarGraficosVG(orgaosAgrupados, anos) {
+function renderizarGraficosVG(orgaosAgrupados, dadosBase, anos) {
     // Gráfico por órgão (top 15)
     const topOrgaos = [...orgaosAgrupados].sort((a,b) => b.total_atas - a.total_atas).slice(0, 15);
     if (chartOrgao) chartOrgao.destroy();
@@ -817,7 +865,7 @@ function renderizarGraficosVG(orgaosAgrupados, anos) {
 
     // Gráfico por tipo (barra vertical)
     const contagemTipo = {};
-    dadosCompletos.forEach(d => { contagemTipo[d.tipo_instrumento] = (contagemTipo[d.tipo_instrumento] || 0) + 1; });
+    dadosBase.forEach(d => { contagemTipo[d.tipo_instrumento] = (contagemTipo[d.tipo_instrumento] || 0) + 1; });
     const tiposOrdenados = Object.entries(contagemTipo).sort((a,b) => b[1]-a[1]);
     if (chartTipo) chartTipo.destroy();
     chartTipo = new Chart(document.getElementById('canvasTipo'), {
@@ -874,9 +922,11 @@ function renderizarConsulta() {
                     <button class="btn-export" onclick="exportarCICSV()"><i class="material-icons">description</i> CSV</button>
                     <button class="btn-export" onclick="exportarCIPDF()"><i class="material-icons">picture_as_pdf</i> PDF</button>
                     <button class="btn-export" onclick="compartilharLinkCI()"><i class="material-icons">link</i> Compartilhar Link</button>
-                    <button class="btn-export" onclick="aplicarFiltrosCI()"><i class="material-icons">search</i> Buscar Registros</button>
                 </div>
-                <span class="table-badge" id="badgeCI">Total de Registros: 0</span>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                    <input type="text" class="form-control" id="buscaGeralCI" placeholder="Buscar registros..." style="width:220px;" oninput="aplicarFiltrosCI()">
+                    <span class="table-badge" id="badgeCI">Total de Registros: 0</span>
+                </div>
             </div>
             <div class="table-fixed-header-container">
                 <table class="table" id="tableCI">
@@ -885,11 +935,11 @@ function renderizarConsulta() {
                             <th class="sortable-header" onclick="ordenarCI('ano')">Ano <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('sigla')">Sigla <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
-                            <th>Tipo</th>
-                            <th>Número</th>
-                            <th>Entidade Aderente (Carona)</th>
+                            <th class="sortable-header" onclick="ordenarCI('tipo_instrumento')">Tipo <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('numero')">Número <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('entidade_aderente')">Entidade Aderente (Carona) <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('data_ord')">Data <i class="material-icons">unfold_more</i></th>
-                            <th>Ata</th>
+                            <th class="sortable-header" onclick="ordenarCI('link_ata')">Ata <i class="material-icons">unfold_more</i></th>
                         </tr>
                     </thead>
                     <tbody id="tbodyCI"></tbody>
@@ -908,12 +958,17 @@ window.aplicarFiltrosCI = function() {
     const tipo = document.getElementById('filtroTipoCI').value;
     const ano = document.getElementById('filtroAnoCI').value;
     const entidade = document.getElementById('filtroEntidadeCI').value.trim().toLowerCase();
+    const busca = document.getElementById('buscaGeralCI').value.trim().toLowerCase();
 
     dadosFiltradosCI = dadosCompletos.filter(d => {
         if (orgao && d.sigla !== orgao) return false;
         if (tipo && d.tipo_instrumento !== tipo) return false;
         if (ano && d.ano !== ano) return false;
         if (entidade && !(d.entidade_aderente || '').toLowerCase().includes(entidade)) return false;
+        if (busca) {
+            const alvo = `${d.ano} ${d.sigla} ${d.orgao} ${d.tipo_instrumento} ${d.numero} ${d.entidade_aderente} ${d.data_publicacao}`.toLowerCase();
+            if (!alvo.includes(busca)) return false;
+        }
         return true;
     });
     paginacaoCI.paginaAtual = 1;
@@ -925,6 +980,7 @@ window.limparFiltrosCI = function() {
     document.getElementById('filtroTipoCI').value = '';
     document.getElementById('filtroAnoCI').value = '';
     document.getElementById('filtroEntidadeCI').value = '';
+    document.getElementById('buscaGeralCI').value = '';
     aplicarFiltrosCI();
 };
 
