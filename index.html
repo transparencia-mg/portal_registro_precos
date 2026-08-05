@@ -71,9 +71,6 @@
             box-shadow: none;
         }
         .data-atualizacao-box i { font-size: 14px; color: var(--accent-red); }
-        .badge-conformidade { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; }
-        .badge-conformidade.ok { background:#dcf5e7; color:#0f6b3a; border:1px solid #b2e6c8; }
-        .badge-conformidade.alerta { background:#fff3cd; color:#856404; border:1px solid #ffe082; }
 
         /* ============================================================
            5. FILTROS
@@ -173,6 +170,17 @@
             flex-wrap: wrap;
             gap: 10px;
         }
+        .table-header-light {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .table-header-light .table-badge { background: #1a3a5c; color: white; }
         .table-title { font-size: 13px; font-weight: 600; margin: 0; }
         .table-badge { background: #1a3a5c; color: white; padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
         .table-fixed-header-container { position: relative; overflow: auto; width: 100%; max-height: 600px; }
@@ -416,7 +424,6 @@
                 <i class="material-icons">event</i>
                 Data de Atualização: <span id="data-atualizacao-header" style="margin-left:4px;">Carregando...</span>
             </div>
-            <span class="badge-conformidade" id="badgeAtualidade"><i class="material-icons" style="font-size:12px;">hourglass_top</i> Verificando...</span>
         </div>
 
         <!-- Conteúdo das abas -->
@@ -473,12 +480,7 @@
 // 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
 // ============================================================
 const CSV_URL = 'https://raw.githubusercontent.com/transparencia-mg/portal_registro_precos/main/dataset/data/atas.csv';
-const REPO_URL = 'https://github.com/transparencia-mg/portal_registro_precos';
-
-const TIPOS_CONHECIDOS = [
-    'Ata de Registro de Preços', 'Pregão Eletrônico', 'Pregão Presencial',
-    'Concorrência', 'Dispensa de Licitação', 'Tomada de Preços', 'Convite', 'RDC'
-];
+const DADOS_MG_URL = 'https://www.dados.mg.gov.br';
 
 let dadosCompletos = [];   // uma linha por ata (já parseada)
 let dadosFiltradosCI = [];
@@ -491,7 +493,6 @@ let paginacaoVG = { paginaAtual: 1, itensPorPagina: 25 };
 let paginacaoCI = { paginaAtual: 1, itensPorPagina: 25 };
 
 let chartOrgao = null;
-let chartAno = null;
 let chartTipo = null;
 
 const chartPalette = ['#1a3a5c','#2c5f8a','#3a7cb8','#5a9fd4','#7ab8e0','#9dd1ec','#d4a017','#c0392b','#27ae60','#8e44ad'];
@@ -543,72 +544,47 @@ function iframeUpdateHeight() {
 }
 
 // ============================================================
-// 3. PARSER DA COLUNA "nome" DO CSV
-//    Padrão observado: "{ORGAO} – {TIPO} nº {NUM} – Gestor – {ENTIDADE ADERENTE} (dd.mm.aaaa)"
-//    A coluna "pagina" é desconsiderada, conforme solicitado.
+// 3. LEITURA DAS COLUNAS DO CSV
+//    Colunas de origem: ano;sigla;orgao;tipo_de_instrumento;numero;
+//                        entidade_aderente_carona;data_de_publicacao;link_da_ata
 // ============================================================
 function parseAta(row, idx) {
-    const nomeOriginal = (row.nome || '').trim();
-    const nome = nomeOriginal.replace(/\u00a0/g, ' ').trim();
-    const linkAta = (row.arquivo || '').trim();
+    const norm = v => (v === null || v === undefined) ? '' : v.toString().replace(/\u00a0/g, ' ').trim();
 
-    // Órgão: primeiro segmento antes do primeiro travessão " – " ou " - "
-    const partes = nome.split(/\s[–-]\s/).map(p => p.trim()).filter(Boolean);
-    let orgao = partes.length ? partes[0] : '';
-    // Corrige casos em que o órgão veio colado ao tipo sem espaço em torno do traço
-    orgao = orgao.replace(/^\s+|\s+$/g,'');
-    if (!orgao) orgao = 'NÃO IDENTIFICADO';
+    const ano = norm(row.ano) || '-';
+    const sigla = norm(row.sigla) || 'NÃO IDENTIFICADO';
+    const orgao = norm(row.orgao) || '-';
+    const tipo = norm(row.tipo_de_instrumento) || 'Outro';
+    const numero = norm(row.numero) || '-';
+    const entidade = norm(row.entidade_aderente_carona) || '-';
+    const linkAta = norm(row.link_da_ata);
 
-    // Tipo do instrumento (primeira ocorrência conhecida no texto)
-    let tipo = 'Outro';
-    for (const t of TIPOS_CONHECIDOS) {
-        const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
-        if (re.test(nome)) { tipo = t; break; }
+    // Data de publicação: aceita dd/mm/aaaa, dd.mm.aaaa ou aaaa-mm-dd
+    let dataStr = norm(row.data_de_publicacao);
+    let dataOrd = 0;
+    let mData = dataStr.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);
+    if (mData) {
+        dataStr = `${mData[1].padStart(2,'0')}/${mData[2].padStart(2,'0')}/${mData[3]}`;
+        dataOrd = new Date(mData[3], mData[2]-1, mData[1]).getTime();
+    } else {
+        mData = dataStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (mData) {
+            dataOrd = new Date(mData[1], mData[2]-1, mData[3]).getTime();
+            dataStr = `${mData[3].padStart(2,'0')}/${mData[2].padStart(2,'0')}/${mData[1]}`;
+        }
     }
-
-    // Número: "nº/n°/Nº <valor>" logo após o tipo identificado
-    let numero = '';
-    const reNum = new RegExp(tipo.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\s*n[ºo°]\\s*[:.]?\\s*([\\w./-]+)', 'i');
-    const mNum = nome.match(reNum);
-    if (mNum) numero = mNum[1];
-
-    // Data: última ocorrência no padrão dd.mm.aaaa ou dd/mm/aaaa no texto
-    let dataStr = '';
-    let ano = '';
-    const datas = [...nome.matchAll(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/g)];
-    if (datas.length) {
-        const d = datas[datas.length - 1];
-        dataStr = `${d[1].padStart(2,'0')}/${d[2].padStart(2,'0')}/${d[3]}`;
-        ano = d[3];
-    }
-    if (!ano) {
-        const ys = (numero.match(/20\d{2}/g)) || (nome.match(/20\d{2}/g));
-        ano = ys ? ys[ys.length - 1] : '';
-    }
-
-    // Entidade aderente / gestor: texto após a última ocorrência de "Gestor"
-    let entidade = '';
-    const idxGestor = nome.toLowerCase().lastIndexOf('gestor');
-    if (idxGestor >= 0) {
-        entidade = nome.substring(idxGestor + 6).replace(/^[\s–-]+/, '');
-    } else if (partes.length) {
-        entidade = partes[partes.length - 1];
-    }
-    entidade = entidade.replace(/\s*\(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}\)\s*$/, '').trim();
-    entidade = entidade.replace(/^[–-]\s*/, '').trim();
-    if (!entidade) entidade = '-';
 
     return {
         id: idx,
-        orgao_sigla: orgao,
+        ano,
+        sigla,
+        orgao,
         tipo_instrumento: tipo,
-        numero: numero || '-',
-        ano: ano || '-',
+        numero,
         entidade_aderente: entidade,
         data_publicacao: dataStr || '-',
-        data_ord: dataStr ? new Date(dataStr.split('/')[2], dataStr.split('/')[1]-1, dataStr.split('/')[0]).getTime() : 0,
-        link_ata: linkAta,
-        nome_original: nomeOriginal
+        data_ord: dataOrd,
+        link_ata: linkAta
     };
 }
 
@@ -623,7 +599,7 @@ function carregarDados() {
         delimiter: ';',
         skipEmptyLines: true,
         complete: function(results) {
-            const rows = results.data.filter(r => r.nome && r.nome.trim() !== '');
+            const rows = results.data.filter(r => (r.sigla && r.sigla.trim() !== '') || (r.orgao && r.orgao.trim() !== ''));
             dadosCompletos = rows.map((r, i) => parseAta(r, i));
             mostrarLoading(false);
             atualizarCabecalho();
@@ -644,25 +620,12 @@ function carregarDados() {
 
 function atualizarCabecalho() {
     if (!dadosCompletos.length) return;
+    // A data exibida corresponde à data da última atualização da pasta "dataset"
+    // (data de publicação mais recente presente na base de dados).
     const comData = dadosCompletos.filter(d => d.data_ord > 0).sort((a,b) => b.data_ord - a.data_ord);
     const maisRecente = comData.length ? comData[0] : null;
     const spanData = document.getElementById('data-atualizacao-header');
-    const badge = document.getElementById('badgeAtualidade');
-
-    if (maisRecente) {
-        spanData.textContent = maisRecente.data_publicacao;
-        const dias = Math.floor((Date.now() - maisRecente.data_ord) / 86400000);
-        if (dias <= 30) {
-            badge.className = 'badge-conformidade ok';
-            badge.innerHTML = `<i class="material-icons" style="font-size:12px;">check_circle</i> Atualizado há ${dias} dia(s) (dentro do prazo de 30 dias)`;
-        } else {
-            badge.className = 'badge-conformidade alerta';
-            badge.innerHTML = `<i class="material-icons" style="font-size:12px;">warning</i> Última publicação há ${dias} dias`;
-        }
-    } else {
-        spanData.textContent = '-';
-        badge.style.display = 'none';
-    }
+    spanData.textContent = maisRecente ? maisRecente.data_publicacao : '-';
 }
 
 // ============================================================
@@ -671,10 +634,11 @@ function atualizarCabecalho() {
 function agruparPorOrgao() {
     const mapa = {};
     dadosCompletos.forEach(d => {
-        if (!mapa[d.orgao_sigla]) mapa[d.orgao_sigla] = { orgao: d.orgao_sigla, total_atas: 0, tipos: {}, anos: {} };
-        mapa[d.orgao_sigla].total_atas++;
-        mapa[d.orgao_sigla].tipos[d.tipo_instrumento] = (mapa[d.orgao_sigla].tipos[d.tipo_instrumento] || 0) + 1;
-        if (d.ano !== '-') mapa[d.orgao_sigla].anos[d.ano] = (mapa[d.orgao_sigla].anos[d.ano] || 0) + 1;
+        if (!mapa[d.sigla]) mapa[d.sigla] = { sigla: d.sigla, orgao: d.orgao, total_atas: 0, tipos: {}, anos: {} };
+        mapa[d.sigla].total_atas++;
+        if (mapa[d.sigla].orgao === '-' && d.orgao !== '-') mapa[d.sigla].orgao = d.orgao;
+        mapa[d.sigla].tipos[d.tipo_instrumento] = (mapa[d.sigla].tipos[d.tipo_instrumento] || 0) + 1;
+        if (d.ano !== '-') mapa[d.sigla].anos[d.ano] = (mapa[d.sigla].anos[d.ano] || 0) + 1;
     });
     return Object.values(mapa);
 }
@@ -725,37 +689,24 @@ function renderizarVisaoGeral() {
             </div>
             <div class="col-md-6">
                 <div class="chart-container">
-                    <div class="chart-header"><p class="chart-title">Atas por Ano de Publicação</p></div>
-                    <div class="chart-wrapper"><canvas id="canvasAno"></canvas></div>
-                </div>
-            </div>
-        </div>
-        <div class="row g-3 mb-3">
-            <div class="col-md-12">
-                <div class="chart-container">
                     <div class="chart-header"><p class="chart-title">Distribuição por Tipo de Instrumento</p></div>
-                    <div class="chart-wrapper" style="height:220px;"><canvas id="canvasTipo"></canvas></div>
+                    <div class="chart-wrapper"><canvas id="canvasTipo"></canvas></div>
                 </div>
             </div>
         </div>
 
         <div class="table-container">
-            <div class="table-header">
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <span class="table-badge" id="badgeVG">${totalOrgaos} órgãos</span>
-                    <button class="btn-export" onclick="exportarVGCSV()"><i class="material-icons">description</i> CSV</button>
-                </div>
-            </div>
             <div class="table-fixed-header-container">
                 <table class="table" id="tableVG">
                     <thead>
                         <tr>
+                            <th class="sortable-header" onclick="ordenarVG('sigla')">Sigla <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarVG('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
-                            <th class="sortable-header" onclick="ordenarVG('total_atas')">Total de Atas <i class="material-icons">unfold_more</i></th>
-                            <th>Ata de Registro de Preços</th>
-                            <th>Pregão Eletrônico</th>
-                            <th>Outros</th>
-                            <th>% do Total</th>
+                            <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('total_atas')">Total de Atas <i class="material-icons">unfold_more</i></th>
+                            <th style="text-align:center;">Ata de Registro de Preços</th>
+                            <th style="text-align:center;">Pregão Eletrônico</th>
+                            <th style="text-align:center;">Outros</th>
+                            <th style="text-align:center;">% do Total</th>
                         </tr>
                     </thead>
                     <tbody id="tbodyVG"></tbody>
@@ -791,16 +742,16 @@ function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
         const outros = o.total_atas - arp - preg;
         const pct = totalAtas ? ((o.total_atas / totalAtas) * 100).toFixed(1) : '0.0';
         return `<tr>
-            <td><a class="orgao-link" onclick="filtrarPorOrgaoENavegar('${escapeHtml(o.orgao)}')">${escapeHtml(o.orgao)}</a></td>
-            <td><b>${o.total_atas}</b></td>
-            <td>${arp}</td>
-            <td>${preg}</td>
-            <td>${outros}</td>
-            <td>${pct}%</td>
+            <td><a class="orgao-link" onclick="filtrarPorOrgaoENavegar('${escapeHtml(o.sigla)}')">${escapeHtml(o.sigla)}</a></td>
+            <td>${escapeHtml(o.orgao)}</td>
+            <td style="text-align:center;"><b>${o.total_atas}</b></td>
+            <td style="text-align:center;">${arp}</td>
+            <td style="text-align:center;">${preg}</td>
+            <td style="text-align:center;">${outros}</td>
+            <td style="text-align:center;">${pct}%</td>
         </tr>`;
-    }).join('') || '<tr><td colspan="6" class="text-center nao-aplica">Nenhum registro encontrado.</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="text-center nao-aplica">Nenhum registro encontrado.</td></tr>';
 
-    document.getElementById('badgeVG').textContent = `${dados.length} órgãos`;
     window.vgAgrupadosOrdenados = dados;
 
     const cont = document.getElementById('paginacaoVGContainer');
@@ -835,12 +786,12 @@ window.filtrarPorOrgaoENavegar = function(orgao) {
 };
 window.exportarVGCSV = function() {
     const dados = window.vgAgrupadosOrdenados || agruparPorOrgao();
-    const csv = [['Órgão','Total de Atas','Ata de Registro de Preços','Pregão Eletrônico','Outros'].join(';'),
+    const csv = [['Sigla','Órgão','Total de Atas','Ata de Registro de Preços','Pregão Eletrônico','Outros'].join(';'),
         ...dados.map(o => {
             const arp = o.tipos['Ata de Registro de Preços'] || 0;
             const preg = (o.tipos['Pregão Eletrônico'] || 0) + (o.tipos['Pregão Presencial'] || 0);
             const outros = o.total_atas - arp - preg;
-            return [o.orgao, o.total_atas, arp, preg, outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';');
+            return [o.sigla, o.orgao, o.total_atas, arp, preg, outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';');
         })
     ].join('\n');
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
@@ -854,7 +805,7 @@ function renderizarGraficosVG(orgaosAgrupados, anos) {
     chartOrgao = new Chart(document.getElementById('canvasOrgao'), {
         type: 'bar',
         data: {
-            labels: topOrgaos.map(o => o.orgao),
+            labels: topOrgaos.map(o => o.sigla),
             datasets: [{ label: 'Nº de Atas', data: topOrgaos.map(o => o.total_atas), backgroundColor: '#1a3a5c', borderRadius: 4 }]
         },
         options: {
@@ -864,26 +815,7 @@ function renderizarGraficosVG(orgaosAgrupados, anos) {
         }
     });
 
-    // Gráfico por ano
-    const contagemAno = {};
-    anos.forEach(a => contagemAno[a] = 0);
-    dadosCompletos.forEach(d => { if (d.ano !== '-') contagemAno[d.ano] = (contagemAno[d.ano] || 0) + 1; });
-    const anosOrdenados = Object.keys(contagemAno).sort();
-    if (chartAno) chartAno.destroy();
-    chartAno = new Chart(document.getElementById('canvasAno'), {
-        type: 'bar',
-        data: {
-            labels: anosOrdenados,
-            datasets: [{ label: 'Nº de Atas', data: anosOrdenados.map(a => contagemAno[a]), backgroundColor: '#b93c42', borderRadius: 4 }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-        }
-    });
-
-    // Gráfico por tipo
+    // Gráfico por tipo (barra vertical)
     const contagemTipo = {};
     dadosCompletos.forEach(d => { contagemTipo[d.tipo_instrumento] = (contagemTipo[d.tipo_instrumento] || 0) + 1; });
     const tiposOrdenados = Object.entries(contagemTipo).sort((a,b) => b[1]-a[1]);
@@ -895,9 +827,9 @@ function renderizarGraficosVG(orgaosAgrupados, anos) {
             datasets: [{ label: 'Nº de Atas', data: tiposOrdenados.map(t => t[1]), backgroundColor: chartPalette, borderRadius: 4 }]
         },
         options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+            scales: { x: { ticks: { autoSkip: false, maxRotation: 30, minRotation: 0 } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
         }
     });
 }
@@ -906,13 +838,17 @@ function renderizarGraficosVG(orgaosAgrupados, anos) {
 // 6. CONSULTA INDIVIDUAL
 // ============================================================
 function renderizarConsulta() {
-    const orgaos = [...new Set(dadosCompletos.map(d => d.orgao_sigla))].sort();
+    const orgaos = [...new Set(dadosCompletos.map(d => d.sigla))].sort();
     const tipos = [...new Set(dadosCompletos.map(d => d.tipo_instrumento))].sort();
     const anos = [...new Set(dadosCompletos.map(d => d.ano).filter(a => a !== '-'))].sort().reverse();
 
     const html = `
         <div class="filter-container" style="margin-top:15px;">
             <div class="filters-row">
+                <div class="filter-group">
+                    <div class="filter-label">Ano</div>
+                    <select class="modern-select" id="filtroAnoCI"><option value="">Todos</option>${anos.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select>
+                </div>
                 <div class="filter-group">
                     <div class="filter-label">Órgão</div>
                     <select class="modern-select" id="filtroOrgaoCI"><option value="">Todos</option>${orgaos.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}</select>
@@ -922,34 +858,33 @@ function renderizarConsulta() {
                     <select class="modern-select" id="filtroTipoCI"><option value="">Todos</option>${tipos.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}</select>
                 </div>
                 <div class="filter-group">
-                    <div class="filter-label">Ano</div>
-                    <select class="modern-select" id="filtroAnoCI"><option value="">Todos</option>${anos.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select>
-                </div>
-                <div class="filter-group" style="flex:2;min-width:220px;">
-                    <div class="filter-label">Pesquisa Livre</div>
-                    <input type="text" class="form-control" id="filtroTextoCI" placeholder="Órgão, número da ata, entidade aderente...">
+                    <div class="filter-label">Entidade Aderente</div>
+                    <input type="text" class="form-control" id="filtroEntidadeCI" placeholder="Nome da entidade aderente (carona)...">
                 </div>
             </div>
             <div class="botoes-abaixo">
-                <button class="btn-pesquisa" onclick="aplicarFiltrosCI()"><i class="material-icons">search</i> Pesquisar</button>
+                <button class="btn-pesquisa" onclick="aplicarFiltrosCI()"><i class="material-icons">refresh</i> Atualizar Filtros</button>
                 <button class="btn-secondary-custom" onclick="limparFiltrosCI()"><i class="material-icons">restart_alt</i> Limpar Filtros</button>
             </div>
         </div>
 
         <div class="table-container">
-            <div class="table-header">
-                <p class="table-title"><i class="material-icons">fact_check</i> Atas de Adesão / Carona</p>
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <span class="table-badge" id="badgeCI">0 registros</span>
+            <div class="table-header-light">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                     <button class="btn-export" onclick="exportarCICSV()"><i class="material-icons">description</i> CSV</button>
+                    <button class="btn-export" onclick="exportarCIPDF()"><i class="material-icons">picture_as_pdf</i> PDF</button>
+                    <button class="btn-export" onclick="compartilharLinkCI()"><i class="material-icons">link</i> Compartilhar Link</button>
+                    <button class="btn-export" onclick="aplicarFiltrosCI()"><i class="material-icons">search</i> Buscar Registros</button>
                 </div>
+                <span class="table-badge" id="badgeCI">Total de Registros: 0</span>
             </div>
             <div class="table-fixed-header-container">
                 <table class="table" id="tableCI">
                     <thead>
                         <tr>
                             <th class="sortable-header" onclick="ordenarCI('ano')">Ano <i class="material-icons">unfold_more</i></th>
-                            <th class="sortable-header" onclick="ordenarCI('orgao_sigla')">Órgão <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('sigla')">Sigla <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
                             <th>Tipo</th>
                             <th>Número</th>
                             <th>Entidade Aderente (Carona)</th>
@@ -964,6 +899,7 @@ function renderizarConsulta() {
         </div>
     `;
     document.getElementById('consulta-content').innerHTML = html;
+    aplicarFiltrosDaURL();
     aplicarFiltrosCI();
 }
 
@@ -971,16 +907,13 @@ window.aplicarFiltrosCI = function() {
     const orgao = document.getElementById('filtroOrgaoCI').value;
     const tipo = document.getElementById('filtroTipoCI').value;
     const ano = document.getElementById('filtroAnoCI').value;
-    const texto = document.getElementById('filtroTextoCI').value.trim().toLowerCase();
+    const entidade = document.getElementById('filtroEntidadeCI').value.trim().toLowerCase();
 
     dadosFiltradosCI = dadosCompletos.filter(d => {
-        if (orgao && d.orgao_sigla !== orgao) return false;
+        if (orgao && d.sigla !== orgao) return false;
         if (tipo && d.tipo_instrumento !== tipo) return false;
         if (ano && d.ano !== ano) return false;
-        if (texto) {
-            const alvo = `${d.orgao_sigla} ${d.numero} ${d.entidade_aderente} ${d.nome_original}`.toLowerCase();
-            if (!alvo.includes(texto)) return false;
-        }
+        if (entidade && !(d.entidade_aderente || '').toLowerCase().includes(entidade)) return false;
         return true;
     });
     paginacaoCI.paginaAtual = 1;
@@ -991,8 +924,64 @@ window.limparFiltrosCI = function() {
     document.getElementById('filtroOrgaoCI').value = '';
     document.getElementById('filtroTipoCI').value = '';
     document.getElementById('filtroAnoCI').value = '';
-    document.getElementById('filtroTextoCI').value = '';
+    document.getElementById('filtroEntidadeCI').value = '';
     aplicarFiltrosCI();
+};
+
+// Lê parâmetros da URL (?ano=&orgao=&tipo=&entidade=) e pré-preenche os filtros
+function aplicarFiltrosDaURL() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const ano = params.get('ano'); const orgao = params.get('orgao');
+        const tipo = params.get('tipo'); const entidade = params.get('entidade');
+        if (ano) document.getElementById('filtroAnoCI').value = ano;
+        if (orgao) document.getElementById('filtroOrgaoCI').value = orgao;
+        if (tipo) document.getElementById('filtroTipoCI').value = tipo;
+        if (entidade) document.getElementById('filtroEntidadeCI').value = entidade;
+    } catch(e) {}
+}
+
+window.compartilharLinkCI = function() {
+    const ano = document.getElementById('filtroAnoCI').value;
+    const orgao = document.getElementById('filtroOrgaoCI').value;
+    const tipo = document.getElementById('filtroTipoCI').value;
+    const entidade = document.getElementById('filtroEntidadeCI').value.trim();
+    const params = new URLSearchParams();
+    if (ano) params.set('ano', ano);
+    if (orgao) params.set('orgao', orgao);
+    if (tipo) params.set('tipo', tipo);
+    if (entidade) params.set('entidade', entidade);
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    navigator.clipboard.writeText(url).then(() => mostrarToast('Link com os filtros atuais copiado!','success'))
+        .catch(() => mostrarToast('Não foi possível copiar o link.','error'));
+};
+
+window.exportarCIPDF = function() {
+    const dados = dadosFiltradosCI.length ? dadosFiltradosCI : dadosCompletos;
+    const linhas = dados.map(d => `<tr>
+        <td>${escapeHtml(d.ano)}</td><td>${escapeHtml(d.sigla)}</td><td>${escapeHtml(d.orgao)}</td>
+        <td>${escapeHtml(d.tipo_instrumento)}</td><td>${escapeHtml(d.numero)}</td>
+        <td>${escapeHtml(d.entidade_aderente)}</td><td>${escapeHtml(d.data_publicacao)}</td>
+    </tr>`).join('');
+    const win = window.open('', '_blank');
+    win.document.write(`
+        <html><head><title>Atas de Adesão / Carona</title>
+        <style>
+            body{font-family:Arial,sans-serif;padding:20px;}
+            h2{color:#1a3a5c;}
+            table{width:100%;border-collapse:collapse;font-size:11px;}
+            th,td{border:1px solid #999;padding:6px 8px;text-align:left;}
+            th{background:#54697b;color:#fff;text-transform:uppercase;}
+            tr:nth-child(even){background:#f4f6f9;}
+        </style></head><body>
+        <h2>Registro de Preços — Atas de Adesão (Carona)</h2>
+        <p>Total de registros: ${dados.length}</p>
+        <table><thead><tr><th>Ano</th><th>Sigla</th><th>Órgão</th><th>Tipo</th><th>Número</th><th>Entidade Aderente (Carona)</th><th>Data</th></tr></thead>
+        <tbody>${linhas}</tbody></table>
+        </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
 };
 
 window.ordenarCI = function(coluna) {
@@ -1019,16 +1008,17 @@ function renderizarTabelaCI() {
     document.getElementById('tbodyCI').innerHTML = pagina.map(d => `
         <tr>
             <td>${escapeHtml(d.ano)}</td>
-            <td>${escapeHtml(d.orgao_sigla)}</td>
+            <td>${escapeHtml(d.sigla)}</td>
+            <td>${escapeHtml(d.orgao)}</td>
             <td><span class="badge-tipo ${getBadgeTipo(d.tipo_instrumento)}">${escapeHtml(d.tipo_instrumento)}</span></td>
             <td>${escapeHtml(d.numero)}</td>
             <td><a class="ata-link" onclick="abrirModalAta(${d.id})">${escapeHtml(d.entidade_aderente)}</a></td>
             <td>${escapeHtml(d.data_publicacao)}</td>
             <td>${d.link_ata ? `<a class="ata-link" href="${escapeHtml(d.link_ata)}" target="_blank" rel="noopener"><i class="material-icons">picture_as_pdf</i> Abrir</a>` : '<span class="nao-aplica">Não disponível</span>'}</td>
         </tr>
-    `).join('') || '<tr><td colspan="7" class="text-center nao-aplica">Nenhuma ata encontrada com os filtros aplicados.</td></tr>';
+    `).join('') || '<tr><td colspan="8" class="text-center nao-aplica">Nenhuma ata encontrada com os filtros aplicados.</td></tr>';
 
-    document.getElementById('badgeCI').textContent = `${dados.length} registros`;
+    document.getElementById('badgeCI').textContent = `Total de Registros: ${dados.length}`;
 
     const cont = document.getElementById('paginacaoCIContainer');
     cont.innerHTML = `
@@ -1055,14 +1045,14 @@ window.abrirModalAta = function(id) {
     modalAtaAtual = d;
     document.getElementById('modalContent').innerHTML = `
         <div class="row g-2">
-            <div class="col-md-6"><div class="info-item"><div class="info-label">Órgão</div><div class="info-value">${escapeHtml(d.orgao_sigla)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Sigla</div><div class="info-value">${escapeHtml(d.sigla)}</div></div></div>
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Órgão</div><div class="info-value">${escapeHtml(d.orgao)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Tipo de Instrumento</div><div class="info-value">${escapeHtml(d.tipo_instrumento)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Número</div><div class="info-value highlight">${escapeHtml(d.numero)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Ano</div><div class="info-value">${escapeHtml(d.ano)}</div></div></div>
             <div class="col-md-12"><div class="info-item"><div class="info-label">Entidade Aderente (Carona)</div><div class="info-value">${escapeHtml(d.entidade_aderente)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Data de Publicação</div><div class="info-value">${escapeHtml(d.data_publicacao)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Link da Ata (PDF)</div><div class="info-value">${d.link_ata ? `<a href="${escapeHtml(d.link_ata)}" target="_blank" rel="noopener">${escapeHtml(d.link_ata)}</a>` : '<span class="nao-aplica">Não disponível</span>'}</div></div></div>
-            <div class="col-md-12"><div class="info-item"><div class="info-label">Descrição Original</div><div class="info-value">${escapeHtml(d.nome_original)}</div></div></div>
         </div>`;
     const btnAbrir = document.getElementById('btnAbrirAtaModal');
     if (d.link_ata) { btnAbrir.style.display = 'inline-flex'; btnAbrir.onclick = () => window.open(d.link_ata, '_blank'); }
@@ -1077,8 +1067,8 @@ window.abrirModalAta = function(id) {
 
 window.exportarCICSV = function() {
     const dados = dadosFiltradosCI.length ? dadosFiltradosCI : dadosCompletos;
-    const csv = [['Ano','Órgão','Tipo de Instrumento','Número','Entidade Aderente (Carona)','Data de Publicação','Link da Ata'].join(';'),
-        ...dados.map(d => [d.ano, d.orgao_sigla, d.tipo_instrumento, d.numero, d.entidade_aderente, d.data_publicacao, d.link_ata]
+    const csv = [['Ano','Sigla','Órgão','Tipo de Instrumento','Número','Entidade Aderente (Carona)','Data de Publicação','Link da Ata'].join(';'),
+        ...dados.map(d => [d.ano, d.sigla, d.orgao, d.tipo_instrumento, d.numero, d.entidade_aderente, d.data_publicacao, d.link_ata]
             .map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';'))
     ].join('\n');
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
@@ -1096,14 +1086,14 @@ function renderizarDicionario() {
                 <table class="metadata-table">
                     <thead><tr><th>Campo (Dashboard)</th><th>Origem no CSV</th><th>Descrição</th><th>Exemplo</th></tr></thead>
                     <tbody>
-                        <tr><td><code>ano</code></td><td>Extraído do campo <code>nome</code></td><td>Ano de publicação da ata de adesão, obtido a partir da data indicada ao final da descrição ou do número do instrumento.</td><td>2023</td></tr>
-                        <tr><td><code>orgao_sigla</code></td><td>Extraído do campo <code>nome</code></td><td>Sigla do órgão ou entidade estadual que divulgou a ata (primeiro segmento do texto).</td><td>PMMG</td></tr>
-                        <tr><td><code>tipo_instrumento</code></td><td>Extraído do campo <code>nome</code></td><td>Tipo do instrumento licitatório de origem: Ata de Registro de Preços, Pregão Eletrônico, Pregão Presencial, entre outros.</td><td>Ata de Registro de Preços</td></tr>
-                        <tr><td><code>numero</code></td><td>Extraído do campo <code>nome</code></td><td>Número/exercício do instrumento (Nº/Ano).</td><td>060/2023</td></tr>
-                        <tr><td><code>entidade_aderente</code></td><td>Extraído do campo <code>nome</code> (trecho após "Gestor")</td><td>Órgão, entidade ou consórcio que aderiu (pegou carona) à ata do órgão gestor.</td><td>Prefeitura Municipal de Ibirité</td></tr>
-                        <tr><td><code>data_publicacao</code></td><td>Extraído do campo <code>nome</code></td><td>Data de divulgação da adesão, no formato dd/mm/aaaa.</td><td>27/12/2023</td></tr>
-                        <tr><td><code>link_ata</code></td><td><code>arquivo</code></td><td>Link direto para o arquivo PDF com a íntegra da ata de adesão.</td><td>https://compras.mg.gov.br/wp-content/uploads/...pdf</td></tr>
-                        <tr><td colspan="4" style="color:#94a3b8;font-style:italic;">A coluna <code>pagina</code> do arquivo-fonte (link da página de listagem) foi desconsiderada, conforme solicitado.</td></tr>
+                        <tr><td><code>ano</code></td><td><code>ano</code></td><td>Ano de publicação da ata de adesão.</td><td>2023</td></tr>
+                        <tr><td><code>sigla</code></td><td><code>sigla</code></td><td>Sigla do órgão ou entidade estadual que divulgou a ata.</td><td>PMMG</td></tr>
+                        <tr><td><code>orgao</code></td><td><code>orgao</code></td><td>Nome completo do órgão ou entidade estadual que divulgou a ata.</td><td>Polícia Militar de Minas Gerais</td></tr>
+                        <tr><td><code>tipo_instrumento</code></td><td><code>tipo_de_instrumento</code></td><td>Tipo do instrumento licitatório de origem: Ata de Registro de Preços, Pregão Eletrônico, Pregão Presencial, entre outros.</td><td>Ata de Registro de Preços</td></tr>
+                        <tr><td><code>numero</code></td><td><code>numero</code></td><td>Número/exercício do instrumento (Nº/Ano).</td><td>060/2023</td></tr>
+                        <tr><td><code>entidade_aderente</code></td><td><code>entidade_aderente_carona</code></td><td>Órgão, entidade ou consórcio que aderiu (pegou carona) à ata do órgão gestor.</td><td>Prefeitura Municipal de Ibirité</td></tr>
+                        <tr><td><code>data_publicacao</code></td><td><code>data_de_publicacao</code></td><td>Data de divulgação da adesão, no formato dd/mm/aaaa.</td><td>27/12/2023</td></tr>
+                        <tr><td><code>link_ata</code></td><td><code>link_da_ata</code></td><td>Link direto para o arquivo PDF com a íntegra da ata de adesão.</td><td>https://compras.mg.gov.br/wp-content/uploads/...pdf</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1132,10 +1122,10 @@ function renderizarDownloads() {
             </div>
             <div class="col-md-4">
                 <div class="btn-download-card">
-                    <div class="dl-icon"><i class="material-icons">code</i></div>
-                    <h6>Repositório de Dados Abertos</h6>
-                    <p>Acesse o CSV-fonte, o histórico de versões e a documentação completa do conjunto de dados no GitHub.</p>
-                    <a class="btn-secondary-custom" href="${REPO_URL}" target="_blank" rel="noopener"><i class="material-icons">open_in_new</i> Abrir Repositório</a>
+                    <div class="dl-icon"><i class="material-icons">public</i></div>
+                    <h6>Portal Dados Abertos MG</h6>
+                    <p>Acesse o conjunto de dados, o histórico de versões e a documentação completa no Portal de Dados Abertos do Governo de Minas Gerais.</p>
+                    <a class="btn-secondary-custom" href="${DADOS_MG_URL}" target="_blank" rel="noopener"><i class="material-icons">open_in_new</i> Abrir Portal Dados MG</a>
                 </div>
             </div>
         </div>
