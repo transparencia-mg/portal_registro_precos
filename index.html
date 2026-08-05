@@ -414,7 +414,7 @@
         <div class="data-atualizacao-container">
             <div class="data-atualizacao-box">
                 <i class="material-icons">event</i>
-                Ata mais recente: <span id="data-atualizacao-header" style="margin-left:4px;">Carregando...</span>
+                Data de Atualização: <span id="data-atualizacao-header" style="margin-left:4px;">Carregando...</span>
             </div>
             <span class="badge-conformidade" id="badgeAtualidade"><i class="material-icons" style="font-size:12px;">hourglass_top</i> Verificando...</span>
         </div>
@@ -689,10 +689,6 @@ function renderizarVisaoGeral() {
     const totalArp = dadosCompletos.filter(d => d.tipo_instrumento === 'Ata de Registro de Preços').length;
 
     const html = `
-        <div class="criterio-box" style="margin-top:15px;">
-            <h6><i class="material-icons" style="font-size:15px;">gavel</i> Item 8.5 &mdash; Divulgação da íntegra das Atas de Adesão (SRP)</h6>
-            <p>Esta seção reúne as atas de adesão / carona a registros de preços divulgadas pelos órgãos do Estado de Minas Gerais, com acesso ao arquivo original de cada ata. Cobertura de <b>${escapeHtml(anoMin)} a ${escapeHtml(anoMax)}</b>, atendendo ao critério de série histórica mínima de 3 anos.</p>
-        </div>
         <div class="row g-3 mb-3">
             <div class="col-md-3">
                 <div class="metric-card">
@@ -745,7 +741,6 @@ function renderizarVisaoGeral() {
 
         <div class="table-container">
             <div class="table-header">
-                <p class="table-title"><i class="material-icons">table_chart</i> Atas por Órgão</p>
                 <div style="display:flex;gap:8px;align-items:center;">
                     <span class="table-badge" id="badgeVG">${totalOrgaos} órgãos</span>
                     <button class="btn-export" onclick="exportarVGCSV()"><i class="material-icons">description</i> CSV</button>
@@ -1114,32 +1109,8 @@ function renderizarDicionario() {
             </div>
         </div>
 
-        <div class="metadata-container">
-            <div class="metadata-header"><i class="material-icons">rule</i> Critérios de Conformidade (Item 8.5)</div>
-            <div style="padding:16px;">
-                <div class="criterio-box">
-                    <h6><i class="material-icons" style="font-size:15px;">event_available</i> Atualidade</h6>
-                    <p>As informações são consideradas atualizadas quando a ata mais recente disponível tiver sido divulgada em, no máximo, 30 dias em relação à data da consulta. O indicador é exibido automaticamente no topo do painel.</p>
-                </div>
-                <div class="criterio-box">
-                    <h6><i class="material-icons" style="font-size:15px;">history</i> Série Histórica</h6>
-                    <p>Considera-se existente o histórico de informações quando os dados disponibilizados cobrirem, no mínimo, os 3 anos anteriores ao da pesquisa. A aba "Visão Geral por Órgão" exibe o período total coberto pela base.</p>
-                </div>
-                <div class="criterio-box">
-                    <h6><i class="material-icons" style="font-size:15px;">filter_alt</i> Filtro de Pesquisa</h6>
-                    <p>A aba "Consulta Individual" permite filtrar as atas por órgão, tipo de instrumento, ano de publicação e por texto livre (pesquisa em órgão, número da ata e entidade aderente).</p>
-                </div>
-            </div>
-        </div>
 
         <div class="metadata-container">
-            <div class="metadata-header"><i class="material-icons">source</i> Fonte dos Dados</div>
-            <div style="padding:16px;font-size:12.5px;color:#334155;line-height:1.6;">
-                Dados extraídos do repositório público
-                <a href="${REPO_URL}" target="_blank" rel="noopener">transparencia-mg/portal_registro_precos</a>,
-                arquivo <code>dataset/data/atas.csv</code>, mantido a partir das publicações do
-                <a href="https://compras.mg.gov.br/acesso-a-informacoes/consultas/divulgacao-adesao-carona/" target="_blank" rel="noopener">Portal de Compras do Estado de Minas Gerais</a>.
-            </div>
         </div>
     `;
     document.getElementById('dicionario-content').innerHTML = html;
@@ -1157,14 +1128,6 @@ function renderizarDownloads() {
                     <h6>Base Completa (CSV)</h6>
                     <p>Todas as atas de adesão / carona a registros de preços já tratadas, no formato original do repositório de dados abertos.</p>
                     <button class="btn-pesquisa" onclick="exportarCICSV()"><i class="material-icons">download</i> Baixar CSV (dados filtrados/completos)</button>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="btn-download-card">
-                    <div class="dl-icon"><i class="material-icons">summarize</i></div>
-                    <h6>Resumo por Órgão (CSV)</h6>
-                    <p>Quantitativo de atas de adesão publicadas por órgão, segmentado por tipo de instrumento.</p>
-                    <button class="btn-pesquisa" onclick="exportarVGCSV()"><i class="material-icons">download</i> Baixar Resumo por Órgão</button>
                 </div>
             </div>
             <div class="col-md-4">
