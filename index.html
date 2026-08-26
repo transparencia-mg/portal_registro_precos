@@ -486,7 +486,7 @@ let dadosCompletos = [];   // uma linha por ata (já parseada)
 let dadosFiltradosCI = [];
 let modalAtaAtual = null;
 
-let sortConfigVG = { coluna: 'orgao', direcao: 'asc' };
+let sortConfigVG = { coluna: 'entidade_aderente', direcao: 'asc' };
 let sortConfigCI = { coluna: 'orgao', direcao: 'asc' };
 
 let paginacaoVG = { paginaAtual: 1, itensPorPagina: 25 };
@@ -547,6 +547,17 @@ function iframeUpdateHeight() {
 // 3. LEITURA DAS COLUNAS DO CSV
 //    Colunas de origem: ano;sigla;orgao;tipo_de_instrumento;numero;
 //                        entidade_aderente_carona;data_de_publicacao;link_da_ata
+//
+//    IMPORTANTE - relação entre os campos:
+//    - orgao: órgão/entidade (de MG ou de outro ente federativo) que é o
+//      GESTOR/DONO da ata de registro de preços original.
+//    - entidade_aderente (origem: entidade_aderente_carona): órgão/entidade
+//      estadual de MG que ADERIU (pegou carona) à ata. É o dado que importa
+//      para a Visão Geral.
+//    - sigla: está sempre ligada à entidade_aderente (carona), e não ao
+//      órgão gestor da ata. Ex.: sigla "PMMG" corresponde à entidade
+//      aderente "Polícia Militar do Estado de Minas Gerais", independente
+//      de qual foi o órgão gestor da ata em cada linha.
 // ============================================================
 function parseAta(row, idx) {
     const norm = v => (v === null || v === undefined) ? '' : v.toString().replace(/\u00a0/g, ' ').trim();
@@ -631,24 +642,26 @@ function atualizarCabecalho() {
 // ============================================================
 // 5. VISÃO GERAL
 // ============================================================
-let filtrosVG = { ano: '', orgao: '', sigla: '' };
+let filtrosVG = { ano: '', entidade: '', sigla: '' };
 
 function obterDadosFiltradosVG() {
     return dadosCompletos.filter(d => {
         if (filtrosVG.ano && d.ano !== filtrosVG.ano) return false;
-        if (filtrosVG.orgao && d.orgao !== filtrosVG.orgao) return false;
+        if (filtrosVG.entidade && d.entidade_aderente !== filtrosVG.entidade) return false;
         if (filtrosVG.sigla && d.sigla !== filtrosVG.sigla) return false;
         return true;
     });
 }
 
+// Agrupa por sigla, vinculando cada sigla à sua Entidade Aderente (Carona) -
+// e não ao órgão gestor da ata, que varia a cada linha.
 function agruparPorOrgao(dados) {
     const base = dados || dadosCompletos;
     const mapa = {};
     base.forEach(d => {
-        if (!mapa[d.sigla]) mapa[d.sigla] = { sigla: d.sigla, orgao: d.orgao, total_atas: 0, tipos: {}, anos: {} };
+        if (!mapa[d.sigla]) mapa[d.sigla] = { sigla: d.sigla, entidade_aderente: d.entidade_aderente, total_atas: 0, tipos: {}, anos: {} };
         mapa[d.sigla].total_atas++;
-        if (mapa[d.sigla].orgao === '-' && d.orgao !== '-') mapa[d.sigla].orgao = d.orgao;
+        if (mapa[d.sigla].entidade_aderente === '-' && d.entidade_aderente !== '-') mapa[d.sigla].entidade_aderente = d.entidade_aderente;
         mapa[d.sigla].tipos[d.tipo_instrumento] = (mapa[d.sigla].tipos[d.tipo_instrumento] || 0) + 1;
         if (d.ano !== '-') mapa[d.sigla].anos[d.ano] = (mapa[d.sigla].anos[d.ano] || 0) + 1;
     });
@@ -667,7 +680,7 @@ function renderizarVisaoGeral() {
 
     // Opções de filtro sempre construídas a partir da base completa de dados
     const anosOpcoes = [...new Set(dadosCompletos.map(d => d.ano).filter(a => a !== '-'))].sort().reverse();
-    const orgaosOpcoes = [...new Set(dadosCompletos.map(d => d.orgao).filter(o => o !== '-'))].sort();
+    const entidadesOpcoes = [...new Set(dadosCompletos.map(d => d.entidade_aderente).filter(o => o !== '-'))].sort();
     const siglasOpcoes = [...new Set(dadosCompletos.map(d => d.sigla))].sort();
 
     const html = `
@@ -678,8 +691,8 @@ function renderizarVisaoGeral() {
                     <select class="modern-select" id="filtroAnoVG"><option value="">Todos</option>${anosOpcoes.map(a=>`<option value="${escapeHtml(a)}" ${filtrosVG.ano===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}</select>
                 </div>
                 <div class="filter-group">
-                    <div class="filter-label">Órgão</div>
-                    <select class="modern-select" id="filtroOrgaoVG"><option value="">Todos</option>${orgaosOpcoes.map(o=>`<option value="${escapeHtml(o)}" ${filtrosVG.orgao===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select>
+                    <div class="filter-label">Entidade Aderente (Carona)</div>
+                    <select class="modern-select" id="filtroEntidadeVG"><option value="">Todas</option>${entidadesOpcoes.map(o=>`<option value="${escapeHtml(o)}" ${filtrosVG.entidade===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select>
                 </div>
                 <div class="filter-group">
                     <div class="filter-label">Sigla</div>
@@ -722,7 +735,7 @@ function renderizarVisaoGeral() {
         <div class="row g-3 mb-3">
             <div class="col-md-6">
                 <div class="chart-container">
-                    <div class="chart-header"><p class="chart-title">Atas por Órgão (Top 15)</p></div>
+                    <div class="chart-header"><p class="chart-title">Atas por Entidade Aderente / Sigla (Top 15)</p></div>
                     <div class="chart-wrapper"><canvas id="canvasOrgao"></canvas></div>
                 </div>
             </div>
@@ -740,7 +753,7 @@ function renderizarVisaoGeral() {
                     <thead>
                         <tr>
                             <th class="sortable-header" onclick="ordenarVG('sigla')">Sigla <i class="material-icons">unfold_more</i></th>
-                            <th class="sortable-header" onclick="ordenarVG('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarVG('entidade_aderente')">Entidade Aderente (Carona) <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('total_atas')">Total de Atas <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('arp')">Ata de Registro de Preços <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" style="text-align:center;" onclick="ordenarVG('preg')">Pregão Eletrônico <i class="material-icons">unfold_more</i></th>
@@ -762,14 +775,14 @@ function renderizarVisaoGeral() {
 
 window.aplicarFiltrosVG = function() {
     filtrosVG.ano = document.getElementById('filtroAnoVG').value;
-    filtrosVG.orgao = document.getElementById('filtroOrgaoVG').value;
+    filtrosVG.entidade = document.getElementById('filtroEntidadeVG').value;
     filtrosVG.sigla = document.getElementById('filtroSiglaVG').value;
     paginacaoVG.paginaAtual = 1;
     renderizarVisaoGeral();
 };
 
 window.limparFiltrosVG = function() {
-    filtrosVG = { ano: '', orgao: '', sigla: '' };
+    filtrosVG = { ano: '', entidade: '', sigla: '' };
     paginacaoVG.paginaAtual = 1;
     renderizarVisaoGeral();
 };
@@ -797,7 +810,7 @@ function renderizarTabelaVG(orgaosAgrupados, totalAtas) {
 
     document.getElementById('tbodyVG').innerHTML = pagina.map(o => `<tr>
             <td><a class="orgao-link" onclick="filtrarPorOrgaoENavegar('${escapeHtml(o.sigla)}')">${escapeHtml(o.sigla)}</a></td>
-            <td>${escapeHtml(o.orgao)}</td>
+            <td>${escapeHtml(o.entidade_aderente)}</td>
             <td style="text-align:center;"><b>${o.total_atas}</b></td>
             <td style="text-align:center;">${o.arp}</td>
             <td style="text-align:center;">${o.preg}</td>
@@ -839,8 +852,8 @@ window.filtrarPorOrgaoENavegar = function(sigla) {
 };
 window.exportarVGCSV = function() {
     const dados = window.vgAgrupadosOrdenados || agruparPorOrgao(obterDadosFiltradosVG());
-    const csv = [['Sigla','Órgão','Total de Atas','Ata de Registro de Preços','Pregão Eletrônico','Outros'].join(';'),
-        ...dados.map(o => [o.sigla, o.orgao, o.total_atas, o.arp, o.preg, o.outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';'))
+    const csv = [['Sigla','Entidade Aderente (Carona)','Total de Atas','Ata de Registro de Preços','Pregão Eletrônico','Outros'].join(';'),
+        ...dados.map(o => [o.sigla, o.entidade_aderente, o.total_atas, o.arp, o.preg, o.outros].map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';'))
     ].join('\n');
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'atas_por_orgao.csv'; a.click();
@@ -898,8 +911,8 @@ function renderizarConsulta() {
                     <select class="modern-select" id="filtroAnoCI"><option value="">Todos</option>${anos.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select>
                 </div>
                 <div class="filter-group">
-                    <div class="filter-label">Órgão</div>
-                    <select class="modern-select" id="filtroOrgaoCI"><option value="">Todos</option>${orgaos.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}</select>
+                    <div class="filter-label">Sigla</div>
+                    <select class="modern-select" id="filtroOrgaoCI"><option value="">Todas</option>${orgaos.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}</select>
                 </div>
                 <div class="filter-group">
                     <div class="filter-label">Tipo de Instrumento</div>
@@ -934,10 +947,10 @@ function renderizarConsulta() {
                         <tr>
                             <th class="sortable-header" onclick="ordenarCI('ano')">Ano <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('sigla')">Sigla <i class="material-icons">unfold_more</i></th>
-                            <th class="sortable-header" onclick="ordenarCI('orgao')">Órgão <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('entidade_aderente')">Entidade Aderente (Carona) <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('tipo_instrumento')">Tipo <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('numero')">Número <i class="material-icons">unfold_more</i></th>
-                            <th class="sortable-header" onclick="ordenarCI('entidade_aderente')">Entidade Aderente (Carona) <i class="material-icons">unfold_more</i></th>
+                            <th class="sortable-header" onclick="ordenarCI('orgao')">Órgão da Ata <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('data_ord')">Data <i class="material-icons">unfold_more</i></th>
                             <th class="sortable-header" onclick="ordenarCI('link_ata')">Ata <i class="material-icons">unfold_more</i></th>
                         </tr>
@@ -1015,9 +1028,9 @@ window.compartilharLinkCI = function() {
 window.exportarCIPDF = function() {
     const dados = dadosFiltradosCI.length ? dadosFiltradosCI : dadosCompletos;
     const linhas = dados.map(d => `<tr>
-        <td>${escapeHtml(d.ano)}</td><td>${escapeHtml(d.sigla)}</td><td>${escapeHtml(d.orgao)}</td>
+        <td>${escapeHtml(d.ano)}</td><td>${escapeHtml(d.sigla)}</td><td>${escapeHtml(d.entidade_aderente)}</td>
         <td>${escapeHtml(d.tipo_instrumento)}</td><td>${escapeHtml(d.numero)}</td>
-        <td>${escapeHtml(d.entidade_aderente)}</td><td>${escapeHtml(d.data_publicacao)}</td>
+        <td>${escapeHtml(d.orgao)}</td><td>${escapeHtml(d.data_publicacao)}</td>
     </tr>`).join('');
     const win = window.open('', '_blank');
     win.document.write(`
@@ -1032,7 +1045,7 @@ window.exportarCIPDF = function() {
         </style></head><body>
         <h2>Registro de Preços — Atas de Adesão (Carona)</h2>
         <p>Total de registros: ${dados.length}</p>
-        <table><thead><tr><th>Ano</th><th>Sigla</th><th>Órgão</th><th>Tipo</th><th>Número</th><th>Entidade Aderente (Carona)</th><th>Data</th></tr></thead>
+        <table><thead><tr><th>Ano</th><th>Sigla</th><th>Entidade Aderente (Carona)</th><th>Tipo</th><th>Número</th><th>Órgão da Ata</th><th>Data</th></tr></thead>
         <tbody>${linhas}</tbody></table>
         </body></html>`);
     win.document.close();
@@ -1065,10 +1078,10 @@ function renderizarTabelaCI() {
         <tr>
             <td>${escapeHtml(d.ano)}</td>
             <td>${escapeHtml(d.sigla)}</td>
-            <td>${escapeHtml(d.orgao)}</td>
+            <td><a class="ata-link" onclick="abrirModalAta(${d.id})">${escapeHtml(d.entidade_aderente)}</a></td>
             <td><span class="badge-tipo ${getBadgeTipo(d.tipo_instrumento)}">${escapeHtml(d.tipo_instrumento)}</span></td>
             <td>${escapeHtml(d.numero)}</td>
-            <td><a class="ata-link" onclick="abrirModalAta(${d.id})">${escapeHtml(d.entidade_aderente)}</a></td>
+            <td>${escapeHtml(d.orgao)}</td>
             <td>${escapeHtml(d.data_publicacao)}</td>
             <td>${d.link_ata ? `<a class="ata-link" href="${escapeHtml(d.link_ata)}" target="_blank" rel="noopener"><i class="material-icons">picture_as_pdf</i> Abrir</a>` : '<span class="nao-aplica">Não disponível</span>'}</td>
         </tr>
@@ -1101,12 +1114,12 @@ window.abrirModalAta = function(id) {
     modalAtaAtual = d;
     document.getElementById('modalContent').innerHTML = `
         <div class="row g-2">
+            <div class="col-md-6"><div class="info-item"><div class="info-label">Ano</div><div class="info-value">${escapeHtml(d.ano)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Sigla</div><div class="info-value">${escapeHtml(d.sigla)}</div></div></div>
-            <div class="col-md-6"><div class="info-item"><div class="info-label">Órgão</div><div class="info-value">${escapeHtml(d.orgao)}</div></div></div>
+            <div class="col-md-12"><div class="info-item"><div class="info-label">Entidade Aderente (Carona)</div><div class="info-value">${escapeHtml(d.entidade_aderente)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Tipo de Instrumento</div><div class="info-value">${escapeHtml(d.tipo_instrumento)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Número</div><div class="info-value highlight">${escapeHtml(d.numero)}</div></div></div>
-            <div class="col-md-6"><div class="info-item"><div class="info-label">Ano</div><div class="info-value">${escapeHtml(d.ano)}</div></div></div>
-            <div class="col-md-12"><div class="info-item"><div class="info-label">Entidade Aderente (Carona)</div><div class="info-value">${escapeHtml(d.entidade_aderente)}</div></div></div>
+            <div class="col-md-12"><div class="info-item"><div class="info-label">Órgão da Ata</div><div class="info-value">${escapeHtml(d.orgao)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Data de Publicação</div><div class="info-value">${escapeHtml(d.data_publicacao)}</div></div></div>
             <div class="col-md-6"><div class="info-item"><div class="info-label">Link da Ata (PDF)</div><div class="info-value">${d.link_ata ? `<a href="${escapeHtml(d.link_ata)}" target="_blank" rel="noopener">${escapeHtml(d.link_ata)}</a>` : '<span class="nao-aplica">Não disponível</span>'}</div></div></div>
         </div>`;
@@ -1123,8 +1136,8 @@ window.abrirModalAta = function(id) {
 
 window.exportarCICSV = function() {
     const dados = dadosFiltradosCI.length ? dadosFiltradosCI : dadosCompletos;
-    const csv = [['Ano','Sigla','Órgão','Tipo de Instrumento','Número','Entidade Aderente (Carona)','Data de Publicação','Link da Ata'].join(';'),
-        ...dados.map(d => [d.ano, d.sigla, d.orgao, d.tipo_instrumento, d.numero, d.entidade_aderente, d.data_publicacao, d.link_ata]
+    const csv = [['Ano','Sigla','Entidade Aderente (Carona)','Tipo de Instrumento','Número','Órgão da Ata','Data de Publicação','Link da Ata'].join(';'),
+        ...dados.map(d => [d.ano, d.sigla, d.entidade_aderente, d.tipo_instrumento, d.numero, d.orgao, d.data_publicacao, d.link_ata]
             .map(c => `"${(c??'').toString().replace(/"/g,'""')}"`).join(';'))
     ].join('\n');
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
@@ -1142,12 +1155,12 @@ function renderizarDicionario() {
                 <table class="metadata-table">
                     <thead><tr><th>Campo (Dashboard)</th><th>Origem no CSV</th><th>Descrição</th><th>Exemplo</th></tr></thead>
                     <tbody>
-                        <tr><td><code>ano</code></td><td><code>ano</code></td><td>Ano de publicação da ata de adesão.</td><td>2023</td></tr>
-                        <tr><td><code>sigla</code></td><td><code>sigla</code></td><td>Sigla do órgão ou entidade estadual que divulgou a ata.</td><td>PMMG</td></tr>
-                        <tr><td><code>orgao</code></td><td><code>orgao</code></td><td>Nome completo do órgão ou entidade estadual que divulgou a ata.</td><td>Polícia Militar de Minas Gerais</td></tr>
+                        <tr><td><code>ano</code></td><td><code>ano</code></td><td>Ano de publicação da adesão (carona) à ata.</td><td>2023</td></tr>
+                        <tr><td><code>sigla</code></td><td><code>sigla</code></td><td>Sigla do órgão/entidade estadual de MG que aderiu (pegou carona) à ata. Está sempre vinculada à Entidade Aderente (Carona), e não ao órgão gestor da ata.</td><td>PMMG</td></tr>
+                        <tr><td><code>entidade_aderente</code></td><td><code>entidade_aderente_carona</code></td><td>Nome completo do órgão, entidade ou consórcio estadual de MG que aderiu (pegou carona) à ata. É o dado que identifica cada sigla e que aparece consolidado na Visão Geral.</td><td>Polícia Militar do Estado de Minas Gerais</td></tr>
                         <tr><td><code>tipo_instrumento</code></td><td><code>tipo_de_instrumento</code></td><td>Tipo do instrumento licitatório de origem: Ata de Registro de Preços, Pregão Eletrônico, Pregão Presencial, entre outros.</td><td>Ata de Registro de Preços</td></tr>
                         <tr><td><code>numero</code></td><td><code>numero</code></td><td>Número/exercício do instrumento (Nº/Ano).</td><td>060/2023</td></tr>
-                        <tr><td><code>entidade_aderente</code></td><td><code>entidade_aderente_carona</code></td><td>Órgão, entidade ou consórcio que aderiu (pegou carona) à ata do órgão gestor.</td><td>Prefeitura Municipal de Ibirité</td></tr>
+                        <tr><td><code>orgao</code></td><td><code>orgao</code></td><td>Órgão, entidade ou consórcio (de MG ou de outro ente federativo) que é o gestor/dono da ata de registro de preços original, ou seja, quem realizou a licitação. Varia a cada linha, mesmo para uma mesma sigla aderente.</td><td>Consórcio Interfederativo Santa Catarina – CINCATARINA</td></tr>
                         <tr><td><code>data_publicacao</code></td><td><code>data_de_publicacao</code></td><td>Data de divulgação da adesão, no formato dd/mm/aaaa.</td><td>27/12/2023</td></tr>
                         <tr><td><code>link_ata</code></td><td><code>link_da_ata</code></td><td>Link direto para o arquivo PDF com a íntegra da ata de adesão.</td><td>https://compras.mg.gov.br/wp-content/uploads/...pdf</td></tr>
                     </tbody>
